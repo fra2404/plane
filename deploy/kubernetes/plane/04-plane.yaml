@@ -281,7 +281,7 @@ spec:
     spec:
       containers:
         - name: admin
-          image: makeplane/plane-admin:v1.4.2
+          image: ghcr.io/fra2404/plane-admin:v1.4.2-worklog
           envFrom:
             - configMapRef:
                 name: plane-config
