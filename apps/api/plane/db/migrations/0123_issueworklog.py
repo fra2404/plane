@@ -59,7 +59,7 @@ class Migration(migrations.Migration):
                     models.ForeignKey(
                         null=True,
                         on_delete=django.db.models.deletion.SET_NULL,
-                        related_name="issueworklog_created_by",
+                        related_name="%(class)s_created_by",
                         to=settings.AUTH_USER_MODEL,
                         verbose_name="Created By",
                     ),
@@ -76,7 +76,7 @@ class Migration(migrations.Migration):
                     "project",
                     models.ForeignKey(
                         on_delete=django.db.models.deletion.CASCADE,
-                        related_name="project_issueworklog",
+                        related_name="project_%(class)s",
                         to="db.project",
                     ),
                 ),
@@ -85,7 +85,7 @@ class Migration(migrations.Migration):
                     models.ForeignKey(
                         null=True,
                         on_delete=django.db.models.deletion.SET_NULL,
-                        related_name="issueworklog_updated_by",
+                        related_name="%(class)s_updated_by",
                         to=settings.AUTH_USER_MODEL,
                         verbose_name="Last Modified By",
                     ),
@@ -94,7 +94,7 @@ class Migration(migrations.Migration):
                     "workspace",
                     models.ForeignKey(
                         on_delete=django.db.models.deletion.CASCADE,
-                        related_name="workspace_issueworklog",
+                        related_name="workspace_%(class)s",
                         to="db.workspace",
                     ),
                 ),
