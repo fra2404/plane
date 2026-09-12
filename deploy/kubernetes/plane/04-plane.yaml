@@ -1,0 +1,390 @@
+# Plane CE services (custom backend + frontend, upstream space/admin/live/proxy)
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: plane-migrator
+  namespace: plane
+spec:
+  backoffLimit: 3
+  template:
+    metadata:
+      labels:
+        app: plane-migrator
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: migrator
+          image: ghcr.io/fra2404/plane-backend:v1.4.2-worklog
+          command: ["./bin/docker-entrypoint-migrator.sh"]
+          envFrom:
+            - configMapRef:
+                name: plane-config
+            - secretRef:
+                name: plane-secrets
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: plane-create-bucket
+  namespace: plane
+spec:
+  backoffLimit: 5
+  template:
+    metadata:
+      labels:
+        app: plane-create-bucket
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: create-bucket
+          image: ghcr.io/fra2404/plane-backend:v1.4.2-worklog
+          command: ["python", "manage.py", "create_bucket"]
+          envFrom:
+            - configMapRef:
+                name: plane-config
+            - secretRef:
+                name: plane-secrets
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: api
+  namespace: plane
+spec:
+  selector:
+    app: plane-api
+  ports:
+    - name: http
+      port: 8000
+      targetPort: 8000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: plane-api
+  namespace: plane
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: plane-api
+  template:
+    metadata:
+      labels:
+        app: plane-api
+    spec:
+      imagePullSecrets:
+        - name: ghcr-plane
+      initContainers:
+        - name: wait-for-db
+          image: postgres:15.7-alpine
+          command:
+            - sh
+            - -c
+            - until pg_isready -h plane-db -p 5432 -U plane; do echo waiting for db; sleep 3; done
+      containers:
+        - name: api
+          image: ghcr.io/fra2404/plane-backend:v1.4.2-worklog
+          command: ["./bin/docker-entrypoint-api.sh"]
+          envFrom:
+            - configMapRef:
+                name: plane-config
+            - secretRef:
+                name: plane-secrets
+          ports:
+            - containerPort: 8000
+          readinessProbe:
+            httpGet:
+              path: /api/health/
+              port: 8000
+            initialDelaySeconds: 20
+            periodSeconds: 15
+          livenessProbe:
+            httpGet:
+              path: /api/health/
+              port: 8000
+            initialDelaySeconds: 60
+            periodSeconds: 30
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              memory: 2Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: plane-worker
+  namespace: plane
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: plane-worker
+  template:
+    metadata:
+      labels:
+        app: plane-worker
+    spec:
+      imagePullSecrets:
+        - name: ghcr-plane
+      containers:
+        - name: worker
+          image: ghcr.io/fra2404/plane-backend:v1.4.2-worklog
+          command: ["./bin/docker-entrypoint-worker.sh"]
+          envFrom:
+            - configMapRef:
+                name: plane-config
+            - secretRef:
+                name: plane-secrets
+          resources:
+            requests:
+              cpu: 100m
+              memory: 512Mi
+            limits:
+              memory: 2Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: plane-beat
+  namespace: plane
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: plane-beat
+  template:
+    metadata:
+      labels:
+        app: plane-beat
+    spec:
+      imagePullSecrets:
+        - name: ghcr-plane
+      containers:
+        - name: beat
+          image: ghcr.io/fra2404/plane-backend:v1.4.2-worklog
+          command: ["./bin/docker-entrypoint-beat.sh"]
+          envFrom:
+            - configMapRef:
+                name: plane-config
+            - secretRef:
+                name: plane-secrets
+          resources:
+            requests:
+              cpu: 50m
+              memory: 256Mi
+            limits:
+              memory: 1Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: web
+  namespace: plane
+spec:
+  selector:
+    app: plane-web
+  ports:
+    - name: http
+      port: 3000
+      targetPort: 3000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: plane-web
+  namespace: plane
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: plane-web
+  template:
+    metadata:
+      labels:
+        app: plane-web
+    spec:
+      imagePullSecrets:
+        - name: ghcr-plane
+      containers:
+        - name: web
+          image: ghcr.io/fra2404/plane-frontend:v1.4.2-worklog
+          ports:
+            - containerPort: 3000
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 3000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: space
+  namespace: plane
+spec:
+  selector:
+    app: plane-space
+  ports:
+    - name: http
+      port: 3000
+      targetPort: 3000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: plane-space
+  namespace: plane
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: plane-space
+  template:
+    metadata:
+      labels:
+        app: plane-space
+    spec:
+      containers:
+        - name: space
+          image: makeplane/plane-space:v1.4.2
+          envFrom:
+            - configMapRef:
+                name: plane-config
+          ports:
+            - containerPort: 3000
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: admin
+  namespace: plane
+spec:
+  selector:
+    app: plane-admin
+  ports:
+    - name: http
+      port: 3000
+      targetPort: 3000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: plane-admin
+  namespace: plane
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: plane-admin
+  template:
+    metadata:
+      labels:
+        app: plane-admin
+    spec:
+      containers:
+        - name: admin
+          image: makeplane/plane-admin:v1.4.2
+          envFrom:
+            - configMapRef:
+                name: plane-config
+          ports:
+            - containerPort: 3000
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: live
+  namespace: plane
+spec:
+  selector:
+    app: plane-live
+  ports:
+    - name: http
+      port: 3000
+      targetPort: 3000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: plane-live
+  namespace: plane
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: plane-live
+  template:
+    metadata:
+      labels:
+        app: plane-live
+    spec:
+      containers:
+        - name: live
+          image: makeplane/plane-live:v1.4.2
+          envFrom:
+            - configMapRef:
+                name: plane-config
+            - secretRef:
+                name: plane-secrets
+          ports:
+            - containerPort: 3000
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: proxy
+  namespace: plane
+spec:
+  selector:
+    app: plane-proxy
+  ports:
+    - name: http
+      port: 80
+      targetPort: 80
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: plane-proxy
+  namespace: plane
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: plane-proxy
+  template:
+    metadata:
+      labels:
+        app: plane-proxy
+    spec:
+      containers:
+        - name: proxy
+          image: makeplane/plane-proxy:v1.4.2
+          env:
+            - name: SITE_ADDRESS
+              value: ":80"
+            - name: FILE_SIZE_LIMIT
+              valueFrom:
+                configMapKeyRef:
+                  name: plane-config
+                  key: FILE_SIZE_LIMIT
+            - name: BUCKET_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: plane-config
+                  key: AWS_S3_BUCKET_NAME
+            - name: TRUSTED_PROXIES
+              value: 0.0.0.0/0
+          ports:
+            - containerPort: 80
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 10
+            periodSeconds: 10

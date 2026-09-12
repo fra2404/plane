@@ -1,0 +1,129 @@
+name: Build and publish Plane images
+
+on:
+  push:
+    branches:
+      - feat/time-tracking
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAMESPACE: ${{ github.repository_owner }}
+  PLANE_TAG: v1.4.2-worklog
+
+jobs:
+  backend:
+    name: Backend (api/worker/beat)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/plane-backend
+          tags: |
+            type=raw,value=${{ env.PLANE_TAG }}
+            type=sha,format=short,prefix=${{ env.PLANE_TAG }}-
+
+      - name: Build and push backend
+        uses: docker/build-push-action@v6
+        with:
+          context: ./apps/api
+          file: ./apps/api/Dockerfile.api
+          platforms: linux/amd64
+          push: true
+          load: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=plane-backend
+          cache-to: type=gha,mode=max,scope=plane-backend
+
+      - name: Validate Django model/migration state
+        run: |
+          IMAGE=$(echo "${{ steps.meta.outputs.tags }}" | head -n1)
+          echo "Using image: $IMAGE"
+          docker run --rm \
+            -e SECRET_KEY=ci-validation-key \
+            -e DATABASE_URL=postgresql://plane:plane@127.0.0.1:5432/plane \
+            -e REDIS_URL=redis://127.0.0.1:6379/ \
+            -e USE_MINIO=0 \
+            -e AWS_REGION=us-east-1 \
+            -e AWS_ACCESS_KEY_ID=ci \
+            -e AWS_SECRET_ACCESS_KEY=ci \
+            -e AWS_S3_BUCKET_NAME=uploads \
+            -e CORS_ALLOWED_ORIGINS=http://localhost \
+            "$IMAGE" python manage.py makemigrations --check --dry-run
+          docker run --rm \
+            -e SECRET_KEY=ci-validation-key \
+            -e DATABASE_URL=postgresql://plane:plane@127.0.0.1:5432/plane \
+            -e REDIS_URL=redis://127.0.0.1:6379/ \
+            -e USE_MINIO=0 \
+            -e AWS_REGION=us-east-1 \
+            -e AWS_ACCESS_KEY_ID=ci \
+            -e AWS_SECRET_ACCESS_KEY=ci \
+            -e AWS_S3_BUCKET_NAME=uploads \
+            -e CORS_ALLOWED_ORIGINS=http://localhost \
+            "$IMAGE" python manage.py check
+
+  frontend:
+    name: Frontend (web)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/plane-frontend
+          tags: |
+            type=raw,value=${{ env.PLANE_TAG }}
+            type=sha,format=short,prefix=${{ env.PLANE_TAG }}-
+
+      - name: Build and push frontend
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./apps/web/Dockerfile.web
+          platforms: linux/amd64
+          push: true
+          build-args: |
+            DOCKER_BUILDKIT=1
+            VITE_API_BASE_URL=
+            VITE_ADMIN_BASE_PATH=/god-mode
+            VITE_LIVE_BASE_PATH=/live
+            VITE_SPACE_BASE_PATH=/spaces
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=plane-frontend
+          cache-to: type=gha,mode=max,scope=plane-frontend
