@@ -27,7 +27,7 @@ data:
   RABBITMQ_USER: plane
   RABBITMQ_VHOST: plane
   USE_MINIO: "1"
-  MINIO_ENDPOINT_SSL: "0"
+  MINIO_ENDPOINT_SSL: "1"
   AWS_REGION: us-east-1
   AWS_S3_BUCKET_NAME: uploads
   AWS_S3_ENDPOINT_URL: http://plane-minio:9000
