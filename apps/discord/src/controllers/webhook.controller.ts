@@ -131,6 +131,24 @@ export class WebhookController {
     return [];
   }
 
+  /** Human-readable project identifier/name for notifications. */
+  private async resolveProjectLabel(payload: PlaneWebhookPayload): Promise<string | undefined> {
+    const data = payload.data as Record<string, unknown> | null;
+    const detail = data?.project_detail as { identifier?: string; name?: string } | undefined;
+    if (detail && (detail.identifier || detail.name)) {
+      return [detail.identifier, detail.name].filter(Boolean).join(" · ");
+    }
+    const projectId = extractProjectId(payload);
+    if (!projectId) return undefined;
+    try {
+      const project = await this.context.plane.getProject(projectId);
+      return [project.identifier, project.name].filter(Boolean).join(" · ");
+    } catch (error) {
+      logger.warn("DISCORD_WEBHOOK: Unable to resolve project name", error);
+      return projectId;
+    }
+  }
+
   /** Map Plane member ids to Discord user ids using DISCORD_USER_MAPPING. */
   private async resolveDiscordUserIds(projectId: string | undefined, memberIds: string[]): Promise<string[]> {
     if (memberIds.length === 0) return [];
@@ -194,10 +212,14 @@ export class WebhookController {
     // Assignments are delivered privately (DM) by default so a person's work
     // items are not broadcast to everyone in the project channel.
     if (isAssignment && delivery !== "channel") {
+      const projectLabel = await this.resolveProjectLabel(payload);
+      const content = projectLabel
+        ? `Ti è stato assegnato un task\nProgetto: ${projectLabel}`
+        : "Ti è stato assegnato un task";
       await Promise.all(
         discordUserIds.map((userId) =>
           sendDirectMessage(this.bot.client, userId, {
-            content: "Ti è stato assegnato un task",
+            content,
             embeds: message.embeds,
           })
         )
