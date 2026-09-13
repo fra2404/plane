@@ -62,10 +62,7 @@ const IntranetPage = observer(function IntranetPage() {
   const [tagsInput, setTagsInput] = useState("");
 
   const canAdmin = allowPermissions([EUserPermissions.ADMIN], EUserPermissionsLevel.WORKSPACE);
-  const canEditDevices = allowPermissions(
-    [EUserPermissions.ADMIN, EUserPermissions.MEMBER],
-    EUserPermissionsLevel.WORKSPACE
-  );
+  const canEditDevices = canAdmin;
 
   const load = async () => {
     if (!workspaceSlug) return;

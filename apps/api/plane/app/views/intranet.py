@@ -30,7 +30,7 @@ class IntranetDeviceViewSet(BaseViewSet):
             return Response({"error": "Not found."}, status=status.HTTP_404_NOT_FOUND)
         return Response(IntranetDeviceSerializer(obj).data)
 
-    @allow_permission([ROLE.ADMIN, ROLE.MEMBER], level="WORKSPACE")
+    @allow_permission([ROLE.ADMIN], level="WORKSPACE")
     def create(self, request, slug):
         workspace = Workspace.objects.get(slug=slug)
         serializer = IntranetDeviceSerializer(data=request.data)
@@ -39,7 +39,7 @@ class IntranetDeviceViewSet(BaseViewSet):
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-    @allow_permission([ROLE.ADMIN, ROLE.MEMBER], level="WORKSPACE")
+    @allow_permission([ROLE.ADMIN], level="WORKSPACE")
     def partial_update(self, request, slug, pk):
         obj = self.get_queryset().filter(pk=pk).first()
         if not obj:
@@ -50,7 +50,7 @@ class IntranetDeviceViewSet(BaseViewSet):
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-    @allow_permission([ROLE.ADMIN, ROLE.MEMBER], level="WORKSPACE")
+    @allow_permission([ROLE.ADMIN], level="WORKSPACE")
     def destroy(self, request, slug, pk):
         obj = self.get_queryset().filter(pk=pk).first()
         if not obj:
