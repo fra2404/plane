@@ -23,6 +23,7 @@ data:
   OIDC_ISSUER_URL: https://sso.algios.dev/application/o/plane/
   OIDC_CLIENT_ID: 4E7rgFxG2wTHMT1WveP6C7oRTRJ51QxoIbOzpnQh
   OIDC_REQUIRE_EMAIL_VERIFIED: "0"
+  OIDC_SCOPES: openid email profile groups
   ENABLE_OIDC_SYNC: "0"
   # Authentik groups -> Plane roles
   OIDC_GROUPS_CLAIM: groups

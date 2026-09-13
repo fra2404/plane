@@ -64,6 +64,7 @@ class OIDCOAuthProvider(OauthAdapter):
             OIDC_CLIENT_ID,
             OIDC_CLIENT_SECRET,
             OIDC_REQUIRE_EMAIL_VERIFIED,
+            OIDC_SCOPES,
         ) = get_configuration_value(
             [
                 {"key": "OIDC_ISSUER_URL", "default": os.environ.get("OIDC_ISSUER_URL")},
@@ -73,6 +74,10 @@ class OIDCOAuthProvider(OauthAdapter):
                     "key": "OIDC_REQUIRE_EMAIL_VERIFIED",
                     "default": os.environ.get("OIDC_REQUIRE_EMAIL_VERIFIED", "0"),
                 },
+                {
+                    "key": "OIDC_SCOPES",
+                    "default": os.environ.get("OIDC_SCOPES", "openid email profile groups"),
+                },
             ]
         )
 
@@ -81,6 +86,9 @@ class OIDCOAuthProvider(OauthAdapter):
                 error_code=AUTHENTICATION_ERROR_CODES["OIDC_NOT_CONFIGURED"],
                 error_message="OIDC_NOT_CONFIGURED",
             )
+
+        if OIDC_SCOPES:
+            self.scope = OIDC_SCOPES
 
         parsed = urlparse(OIDC_ISSUER_URL)
         if parsed.scheme not in ("https", "http") or not parsed.netloc:
