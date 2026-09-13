@@ -165,8 +165,8 @@ async function resolveDiscordMemberId(
   if (mapped.includes("@")) {
     try {
       const members = await deps.plane.listProjectMembers(projectId);
-      const match = members.find(({ member }) => (member.email ?? "").toLowerCase() === mapped.toLowerCase());
-      return match?.member.id;
+      const match = members.find((member) => (member.email ?? "").toLowerCase() === mapped.toLowerCase());
+      return match?.id;
     } catch (error) {
       logger.warn(`DISCORD_COMMANDS: Unable to resolve member by email "${mapped}"`, error);
       return undefined;
@@ -264,9 +264,9 @@ async function handleAutocomplete(interaction: AutocompleteInteraction, deps: Co
       special.push({ name: "All members", value: "__all__" });
     }
     const matches = members
-      .filter(({ member }) => `${member.display_name ?? ""} ${member.email ?? ""}`.toLowerCase().includes(query))
+      .filter((member) => `${member.display_name ?? ""} ${member.email ?? ""}`.toLowerCase().includes(query))
       .slice(0, Math.max(0, 25 - special.length))
-      .map(({ member }) => ({
+      .map((member) => ({
         name: (member.email
           ? `${member.display_name ?? member.email} <${member.email}>`
           : (member.display_name ?? member.id)
@@ -328,7 +328,7 @@ async function handleIssueList(interaction: ChatInputCommandInteraction, deps: C
     targetMemberId = assigneeOption;
     try {
       const members = await deps.plane.listProjectMembers(projectId);
-      const member = members.find(({ member: candidate }) => candidate.id === targetMemberId)?.member;
+      const member = members.find((candidate) => candidate.id === targetMemberId);
       label = member?.display_name ?? member?.email ?? "selected member";
     } catch {
       label = "selected member";

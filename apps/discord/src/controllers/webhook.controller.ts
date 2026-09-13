@@ -77,7 +77,7 @@ export class WebhookController {
     if (!projectId || ids.length === 0) return [];
     try {
       const members = await this.context.plane.listProjectMembers(projectId);
-      const names = new Map(members.map(({ member }) => [member.id, member.display_name ?? member.email ?? member.id]));
+      const names = new Map(members.map((member) => [member.id, member.display_name ?? member.email ?? member.id]));
       return ids.map((id) => names.get(id) ?? id);
     } catch (error) {
       logger.warn("DISCORD_WEBHOOK: Unable to resolve assignee names", error);

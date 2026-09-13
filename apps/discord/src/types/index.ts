@@ -41,11 +41,6 @@ export interface PlaneWorkItem {
   updated_at?: string;
 }
 
-export interface PlaneProjectMember {
-  id: string;
-  member: PlaneUser;
-}
-
 export interface PlaneComment {
   id: string;
   comment_html: string;

@@ -5,7 +5,17 @@
  */
 
 import { AppError } from "@/lib/errors";
-import type { Paginated, PlaneProject, PlaneProjectMember, PlaneState, PlaneWorkItem } from "@/types";
+import type { Paginated, PlaneProject, PlaneState, PlaneUser, PlaneWorkItem } from "@/types";
+
+type RawProjectMember = PlaneUser | { id?: string; member?: PlaneUser };
+
+/** The public API returns flat users; older/internal shapes nest them under `member`. */
+function normalizeMember(entry: RawProjectMember): PlaneUser {
+  if (entry && typeof entry === "object" && "member" in entry && entry.member) {
+    return entry.member;
+  }
+  return entry as PlaneUser;
+}
 
 interface RequestOptions {
   method?: "GET" | "POST" | "PATCH" | "DELETE";
@@ -27,7 +37,7 @@ export interface CreateWorkItemInput {
  */
 export class PlaneClient {
   private projectsCache: { at: number; value: PlaneProject[] } | undefined;
-  private membersCache = new Map<string, { at: number; value: PlaneProjectMember[] }>();
+  private membersCache = new Map<string, { at: number; value: PlaneUser[] }>();
 
   constructor(
     private readonly baseUrl: string,
@@ -115,16 +125,16 @@ export class PlaneClient {
     return this.unwrapResults(data);
   }
 
-  async listProjectMembers(projectId: string, force = false): Promise<PlaneProjectMember[]> {
+  async listProjectMembers(projectId: string, force = false): Promise<PlaneUser[]> {
     const cached = this.membersCache.get(projectId);
     if (!force && cached && Date.now() - cached.at < this.projectsTtlMs) {
       return cached.value;
     }
-    const data = await this.request<Paginated<PlaneProjectMember> | PlaneProjectMember[]>(
+    const data = await this.request<Paginated<RawProjectMember> | RawProjectMember[]>(
       `/workspaces/${this.workspaceSlug}/projects/${projectId}/project-members-lite/`,
       { query: { per_page: 100 } }
     );
-    const value = this.unwrapResults(data);
+    const value = this.unwrapResults(data).map(normalizeMember);
     this.membersCache.set(projectId, { at: Date.now(), value });
     return value;
   }
