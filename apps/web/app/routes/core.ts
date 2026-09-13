@@ -406,6 +406,11 @@ export const coreRoutes: RouteConfigEntry[] = [
   // Register redirect
   route("register", "routes/redirects/core/register.tsx"),
 
+  // Mobile app deep links (/m/auth, /m/...) — Community Edition has no native
+  // mobile auth, so avoid the 404 page by sending them to the web sign-in.
+  route("m", "routes/redirects/core/mobile-auth.tsx"),
+  route("m/auth", "routes/redirects/core/mobile-auth.tsx"),
+
   // Profile settings redirects
   route("profile/*", "routes/redirects/core/profile-settings.tsx"),
 
