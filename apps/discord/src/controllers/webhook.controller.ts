@@ -188,6 +188,10 @@ export class WebhookController {
         ? await this.resolveDiscordUserIds(extractProjectId(payload), assignedMemberIds)
         : [];
 
+    logger.info(
+      `DISCORD_WEBHOOK: assignment check event=${payload.event} action=${payload.action} field=${String(payload.activity?.field)} assigned=${JSON.stringify(assignedMemberIds)} discord=${JSON.stringify(discordUserIds)} mention=${this.context.mentionAssignee} dm=${this.context.dmAssignee}`
+    );
+
     if (discordUserIds.length && this.context.mentionAssignee) {
       message.content = `${discordUserIds.map((id) => `<@${id}>`).join(" ")} Ti è stato assegnato un task`;
     }
