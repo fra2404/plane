@@ -414,6 +414,8 @@ class OIDCOAuthProvider(OauthAdapter):
             workspace_slugs_raw,
             instance_admin_groups_raw,
             grant_instance_admin_raw,
+            sync_roles_raw,
+            empty_groups_action_raw,
         ) = get_configuration_value(
             [
                 {"key": "OIDC_GROUPS_CLAIM", "default": os.environ.get("OIDC_GROUPS_CLAIM", "groups")},
@@ -432,13 +434,30 @@ class OIDCOAuthProvider(OauthAdapter):
                     "key": "OIDC_GRANT_INSTANCE_ADMIN",
                     "default": os.environ.get("OIDC_GRANT_INSTANCE_ADMIN", "0"),
                 },
+                {"key": "OIDC_SYNC_ROLES", "default": os.environ.get("OIDC_SYNC_ROLES", "1")},
+                {
+                    "key": "OIDC_EMPTY_GROUPS_ACTION",
+                    "default": os.environ.get("OIDC_EMPTY_GROUPS_ACTION", "skip"),
+                },
             ]
         )
+
+        if str(sync_roles_raw) != "1":
+            return
 
         raw_groups = self.oidc_claims.get(groups_claim_name) or []
         if isinstance(raw_groups, str):
             raw_groups = [raw_groups]
         group_set = {str(group).strip().lower() for group in raw_groups if str(group).strip()}
+
+        # Safety: if the provider did not return any groups (e.g. the groups
+        # claim is not mapped), do not demote existing admins unless explicitly
+        # requested. This avoids locking people out on a misconfigured claim.
+        if not group_set and str(empty_groups_action_raw) != "demote":
+            self.logger.warning(
+                "OIDC group sync skipped: no '%s' claim returned; keeping current roles", groups_claim_name
+            )
+            return
 
         admin_groups = {group.strip().lower() for group in str(admin_groups_raw or "").split(",") if group.strip()}
         is_admin = bool(group_set & admin_groups)
@@ -454,9 +473,10 @@ class OIDCOAuthProvider(OauthAdapter):
         workspace_slugs = [slug.strip() for slug in str(workspace_slugs_raw or "").split(",") if slug.strip()]
         auto_join = str(auto_join_raw) == "1"
 
-        self.logger.info(
-            "OIDC group sync: groups=%s admin=%s role=%s workspaces=%s auto_join=%s",
+        self.logger.warning(
+            "OIDC group sync: groups=%s admin_groups=%s admin=%s role=%s workspaces=%s auto_join=%s",
             sorted(group_set),
+            sorted(admin_groups),
             is_admin,
             role,
             workspace_slugs,
