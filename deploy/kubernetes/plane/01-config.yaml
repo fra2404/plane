@@ -17,6 +17,13 @@ data:
   LIVE_BASE_URL: https://plane.algios.dev
   LIVE_BASE_PATH: /live
   CORS_ALLOWED_ORIGINS: https://plane.algios.dev
+  # OIDC / SSO (Authentik). Set IS_OIDC_ENABLED=1 and fill the values to enable.
+  IS_OIDC_ENABLED: "0"
+  OIDC_DISPLAY_NAME: SSO
+  OIDC_ISSUER_URL: ""
+  OIDC_CLIENT_ID: ""
+  OIDC_REQUIRE_EMAIL_VERIFIED: "0"
+  ENABLE_OIDC_SYNC: "0"
   POSTGRES_USER: plane
   POSTGRES_DB: plane
   POSTGRES_HOST: plane-db

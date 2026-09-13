@@ -59,11 +59,24 @@ export type TWorkspaceWorklogUserTotal = {
   worklog_count: number;
 };
 
+export type TWorkspaceWorklogMonthTotal = {
+  month: string;
+  duration: number;
+  worklog_count: number;
+};
+
+export type TWorkspaceWorklogMonthUserTotal = TWorkspaceWorklogMonthTotal & {
+  actor_id: string | null;
+  actor_detail: IUserLite | null;
+};
+
 export type TWorkspaceWorklogSummary = {
   group_by: string;
   total_logged_time: number;
   results: TWorkspaceWorklogSummaryRow[];
   user_totals: TWorkspaceWorklogUserTotal[];
+  monthly_totals: TWorkspaceWorklogMonthTotal[];
+  monthly_user_totals: TWorkspaceWorklogMonthUserTotal[];
 };
 
 export type TWorkspaceWorklogSummaryParams = {

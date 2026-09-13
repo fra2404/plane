@@ -244,7 +244,7 @@ spec:
     spec:
       containers:
         - name: space
-          image: makeplane/plane-space:v1.4.2
+          image: ghcr.io/fra2404/plane-space:v1.4.2-worklog
           envFrom:
             - configMapRef:
                 name: plane-config

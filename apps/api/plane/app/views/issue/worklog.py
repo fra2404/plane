@@ -6,6 +6,7 @@ import json
 
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db.models import Count, Exists, Sum
+from django.db.models.functions import TruncMonth
 from django.utils import timezone
 from django.utils.dateparse import parse_date
 from rest_framework import status
@@ -316,7 +317,27 @@ class WorkspaceWorklogSummaryEndpoint(BaseAPIView):
             .order_by("-duration")
         )
 
+        user_totals_rows = list(
+            worklogs.values("actor_id").annotate(duration=Sum("duration"), worklog_count=Count("id")).order_by("-duration")
+        )
+
+        monthly_rows = list(
+            worklogs.annotate(month=TruncMonth("logged_at"))
+            .values("month")
+            .annotate(duration=Sum("duration"), worklog_count=Count("id"))
+            .order_by("-month")
+        )
+
+        monthly_user_rows = list(
+            worklogs.annotate(month=TruncMonth("logged_at"))
+            .values("month", "actor_id")
+            .annotate(duration=Sum("duration"), worklog_count=Count("id"))
+            .order_by("-month", "-duration")
+        )
+
         actor_ids = {row["actor_id"] for row in rows if row["actor_id"]}
+        actor_ids |= {row["actor_id"] for row in user_totals_rows if row["actor_id"]}
+        actor_ids |= {row["actor_id"] for row in monthly_user_rows if row["actor_id"]}
         actors = {user.id: UserLiteSerializer(user).data for user in User.objects.filter(id__in=actor_ids)}
 
         results = [
@@ -333,9 +354,6 @@ class WorkspaceWorklogSummaryEndpoint(BaseAPIView):
             for row in rows
         ]
 
-        user_totals_rows = (
-            worklogs.values("actor_id").annotate(duration=Sum("duration"), worklog_count=Count("id")).order_by("-duration")
-        )
         user_totals = [
             {
                 "actor_id": str(row["actor_id"]) if row["actor_id"] else None,
@@ -346,6 +364,28 @@ class WorkspaceWorklogSummaryEndpoint(BaseAPIView):
             for row in user_totals_rows
         ]
 
+        monthly_totals = [
+            {
+                "month": row["month"].strftime("%Y-%m"),
+                "duration": row["duration"] or 0,
+                "worklog_count": row["worklog_count"],
+            }
+            for row in monthly_rows
+            if row["month"]
+        ]
+
+        monthly_user_totals = [
+            {
+                "month": row["month"].strftime("%Y-%m"),
+                "actor_id": str(row["actor_id"]) if row["actor_id"] else None,
+                "actor_detail": actors.get(row["actor_id"]),
+                "duration": row["duration"] or 0,
+                "worklog_count": row["worklog_count"],
+            }
+            for row in monthly_user_rows
+            if row["month"]
+        ]
+
         total_logged_time = sum(row["duration"] for row in results)
 
         return Response(
@@ -354,6 +394,8 @@ class WorkspaceWorklogSummaryEndpoint(BaseAPIView):
                 "total_logged_time": total_logged_time,
                 "results": results,
                 "user_totals": user_totals,
+                "monthly_totals": monthly_totals,
+                "monthly_user_totals": monthly_user_totals,
             },
             status=status.HTTP_200_OK,
         )

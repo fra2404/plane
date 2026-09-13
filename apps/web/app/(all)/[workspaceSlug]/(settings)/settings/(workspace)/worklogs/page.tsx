@@ -26,26 +26,61 @@ import { WorklogsWorkspaceSettingsHeader } from "./header";
 
 const issueService = new IssueService();
 
+const monthEnd = (month: string) => {
+  const [year, monthNumber] = month.split("-").map(Number);
+  const lastDay = new Date(year, monthNumber, 0).getDate();
+  return `${month}-${String(lastDay).padStart(2, "0")}`;
+};
+
+const formatMonth = (month: string) => {
+  const date = new Date(`${month}-01T12:00:00`);
+  if (Number.isNaN(date.getTime())) return month;
+  return date.toLocaleDateString(undefined, { year: "numeric", month: "long" });
+};
+
 const WorkspaceWorklogsSettingsPage = observer(function WorkspaceWorklogsSettingsPage() {
   const { workspaceSlug } = useParams();
   const { t } = useTranslation();
   const { currentWorkspace } = useWorkspace();
   const { workspaceUserInfo, allowPermissions } = useUserPermissions();
 
+  const [overview, setOverview] = useState<TWorkspaceWorklogSummary | null>(null);
   const [summary, setSummary] = useState<TWorkspaceWorklogSummary | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
+  const [selectedMonth, setSelectedMonth] = useState<string>("all");
 
   const canAdmin = allowPermissions([EUserPermissions.ADMIN], EUserPermissionsLevel.WORKSPACE);
 
+  // Full (unfiltered) overview: keeps the month list and per-month totals stable.
+  useEffect(() => {
+    if (!workspaceSlug || !canAdmin) return;
+    let isActive = true;
+    const load = async () => {
+      try {
+        const response = await issueService.fetchWorkspaceWorklogSummary(workspaceSlug);
+        if (isActive) setOverview(response);
+      } catch {
+        // overview is best-effort
+      }
+    };
+    void load();
+    return () => {
+      isActive = false;
+    };
+  }, [workspaceSlug, canAdmin]);
+
+  // Filtered detail for the selected month.
   useEffect(() => {
     if (!workspaceSlug || !canAdmin) return;
     let isActive = true;
     setIsLoading(true);
     setHasError(false);
+    const params =
+      selectedMonth === "all" ? undefined : { date_from: `${selectedMonth}-01`, date_to: monthEnd(selectedMonth) };
     const load = async () => {
       try {
-        const response = await issueService.fetchWorkspaceWorklogSummary(workspaceSlug);
+        const response = await issueService.fetchWorkspaceWorklogSummary(workspaceSlug, params);
         if (isActive) setSummary(response);
       } catch {
         if (isActive) setHasError(true);
@@ -57,7 +92,7 @@ const WorkspaceWorklogsSettingsPage = observer(function WorkspaceWorklogsSetting
     return () => {
       isActive = false;
     };
-  }, [workspaceSlug, canAdmin]);
+  }, [workspaceSlug, canAdmin, selectedMonth]);
 
   if (workspaceUserInfo && !canAdmin) {
     return <NotAuthorizedView section="settings" className="h-auto" />;
@@ -66,17 +101,36 @@ const WorkspaceWorklogsSettingsPage = observer(function WorkspaceWorklogsSetting
   const pageTitle = currentWorkspace?.name ? `${currentWorkspace.name} - Worklogs` : undefined;
   const userTotals = summary?.user_totals ?? [];
   const rows = summary?.results ?? [];
+  const months = overview?.monthly_totals ?? summary?.monthly_totals ?? [];
 
   return (
     <SettingsContentWrapper header={<WorklogsWorkspaceSettingsHeader />} hugging>
       <PageHead title={pageTitle} />
       <section className="size-full">
-        <div className="flex items-center justify-between gap-4 pb-3.5">
+        <div className="flex flex-wrap items-center justify-between gap-4 pb-3.5">
           <h4 className="text-h3-medium">{t("common.worklogs")}</h4>
-          <span className="text-body-sm-regular text-tertiary">
-            Total:{" "}
-            <span className="font-medium text-primary">{formatWorklogDuration(summary?.total_logged_time ?? 0)}</span>
-          </span>
+          <div className="flex items-center gap-3">
+            <label className="text-body-sm-regular text-tertiary" htmlFor="worklog-month">
+              {selectedMonth === "all" ? "All months" : formatMonth(selectedMonth)}
+            </label>
+            <select
+              id="worklog-month"
+              value={selectedMonth}
+              onChange={(event) => setSelectedMonth(event.target.value)}
+              className="rounded-md border border-subtle bg-surface-1 px-2.5 py-1.5 text-body-sm-regular text-primary outline-none"
+            >
+              <option value="all">All months</option>
+              {months.map((item) => (
+                <option key={item.month} value={item.month}>
+                  {formatMonth(item.month)}
+                </option>
+              ))}
+            </select>
+            <span className="text-body-sm-regular text-tertiary">
+              Total:{" "}
+              <span className="font-medium text-primary">{formatWorklogDuration(summary?.total_logged_time ?? 0)}</span>
+            </span>
+          </div>
         </div>
 
         {isLoading && <p className="py-3 text-body-sm-regular text-tertiary">{t("loading")}...</p>}
@@ -87,6 +141,40 @@ const WorkspaceWorklogsSettingsPage = observer(function WorkspaceWorklogsSetting
 
         {!isLoading && !hasError && (
           <div className="space-y-8">
+            <div>
+              <h5 className="pb-2 text-body-sm-medium text-secondary">By month</h5>
+              {months.length === 0 ? (
+                <p className="py-2 text-body-sm-regular text-tertiary">{t("activity_empty_state.no_worklogs")}</p>
+              ) : (
+                <div className="overflow-hidden rounded-md border border-subtle">
+                  <table className="w-full table-auto text-left text-body-sm-regular">
+                    <thead className="bg-surface-2 text-tertiary">
+                      <tr>
+                        <th className="px-3 py-2 font-medium">Month</th>
+                        <th className="px-3 py-2 font-medium">{t("common.worklogs")}</th>
+                        <th className="px-3 py-2 text-right font-medium">{t("common.duration")}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {months.map((item) => (
+                        <tr
+                          key={item.month}
+                          className="cursor-pointer border-t border-subtle hover:bg-surface-2"
+                          onClick={() => setSelectedMonth((current) => (current === item.month ? "all" : item.month))}
+                        >
+                          <td className="px-3 py-2 text-primary">{formatMonth(item.month)}</td>
+                          <td className="px-3 py-2 text-secondary">{item.worklog_count}</td>
+                          <td className="px-3 py-2 text-right font-medium text-primary">
+                            {formatWorklogDuration(item.duration)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
             <div>
               <h5 className="pb-2 text-body-sm-medium text-secondary">{t("common.members")}</h5>
               {userTotals.length === 0 ? (
