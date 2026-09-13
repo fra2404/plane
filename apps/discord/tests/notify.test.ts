@@ -32,8 +32,8 @@ describe("stripHtml", () => {
 });
 
 describe("buildWebhookMessage", () => {
-  it("builds an embed for a created work item", () => {
-    const message = buildWebhookMessage(
+  it("builds an embed for a created work item", async () => {
+    const message = await buildWebhookMessage(
       buildPayload({
         data: {
           id: "issue-1",
@@ -56,8 +56,29 @@ describe("buildWebhookMessage", () => {
     expect(embed.fields?.some((field) => field.name === "Priority" && field.value === "high")).toBe(true);
   });
 
-  it("includes the changed field on updates", () => {
-    const message = buildWebhookMessage(
+  it("resolves assignee names via the resolver", async () => {
+    const message = await buildWebhookMessage(
+      buildPayload({
+        data: {
+          id: "issue-1",
+          project: "project-1",
+          sequence_id: 42,
+          name: "Fix the thing",
+          assignees: ["u1", "u2"],
+        },
+      }),
+      {
+        ...options,
+        resolveAssignees: async (_projectId, ids) => ids.map((id) => (id === "u1" ? "Alice" : "Bob")),
+      }
+    );
+
+    const assignees = message!.embeds[0].fields?.find((field) => field.name === "Assignees");
+    expect(assignees?.value).toBe("Alice, Bob");
+  });
+
+  it("includes the changed field on updates", async () => {
+    const message = await buildWebhookMessage(
       buildPayload({
         action: "update",
         data: { id: "issue-1", project: "project-1", sequence_id: 7, name: "Task" },
@@ -70,8 +91,8 @@ describe("buildWebhookMessage", () => {
     expect(changeField?.value).toBe("low → high");
   });
 
-  it("builds an embed for a comment", () => {
-    const message = buildWebhookMessage(
+  it("builds an embed for a comment", async () => {
+    const message = await buildWebhookMessage(
       buildPayload({
         event: "issue_comment",
         data: {
@@ -91,7 +112,7 @@ describe("buildWebhookMessage", () => {
     expect(embed.url).toBe("https://app.plane.so/acme/projects/project-1/work-items/issue-1");
   });
 
-  it("returns null for unsupported events", () => {
-    expect(buildWebhookMessage(buildPayload({ event: "workspace" }), options)).toBeNull();
+  it("returns null for unsupported events", async () => {
+    expect(await buildWebhookMessage(buildPayload({ event: "workspace" }), options)).toBeNull();
   });
 });

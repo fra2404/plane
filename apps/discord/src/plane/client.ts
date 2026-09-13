@@ -27,6 +27,7 @@ export interface CreateWorkItemInput {
  */
 export class PlaneClient {
   private projectsCache: { at: number; value: PlaneProject[] } | undefined;
+  private membersCache = new Map<string, { at: number; value: PlaneProjectMember[] }>();
 
   constructor(
     private readonly baseUrl: string,
@@ -114,12 +115,18 @@ export class PlaneClient {
     return this.unwrapResults(data);
   }
 
-  async listProjectMembers(projectId: string): Promise<PlaneProjectMember[]> {
+  async listProjectMembers(projectId: string, force = false): Promise<PlaneProjectMember[]> {
+    const cached = this.membersCache.get(projectId);
+    if (!force && cached && Date.now() - cached.at < this.projectsTtlMs) {
+      return cached.value;
+    }
     const data = await this.request<Paginated<PlaneProjectMember> | PlaneProjectMember[]>(
       `/workspaces/${this.workspaceSlug}/projects/${projectId}/project-members-lite/`,
       { query: { per_page: 100 } }
     );
-    return this.unwrapResults(data);
+    const value = this.unwrapResults(data);
+    this.membersCache.set(projectId, { at: Date.now(), value });
+    return value;
   }
 
   async listWorkItems(
@@ -141,12 +148,15 @@ export class PlaneClient {
 
   async getWorkItem(projectId: string, workItemId: string): Promise<PlaneWorkItem> {
     return this.request<PlaneWorkItem>(
-      `/workspaces/${this.workspaceSlug}/projects/${projectId}/work-items/${workItemId}/`
+      `/workspaces/${this.workspaceSlug}/projects/${projectId}/work-items/${workItemId}/`,
+      { query: { expand: "assignees" } }
     );
   }
 
   async getWorkItemByKey(key: string): Promise<PlaneWorkItem> {
-    return this.request<PlaneWorkItem>(`/workspaces/${this.workspaceSlug}/work-items/${key}/`);
+    return this.request<PlaneWorkItem>(`/workspaces/${this.workspaceSlug}/work-items/${key}/`, {
+      query: { expand: "assignees" },
+    });
   }
 
   async createWorkItem(projectId: string, input: CreateWorkItemInput): Promise<PlaneWorkItem> {

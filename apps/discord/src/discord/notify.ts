@@ -40,6 +40,8 @@ const EVENT_LABELS: Record<string, string> = {
 
 type WebhookData = Record<string, unknown>;
 
+export type AssigneeResolver = (projectId: string | undefined, ids: string[]) => Promise<string[]>;
+
 function asRecord(value: unknown): WebhookData | undefined {
   return value && typeof value === "object" && !Array.isArray(value) ? (value as WebhookData) : undefined;
 }
@@ -99,7 +101,12 @@ function resolveColor(data: WebhookData): number {
   return 0x5e6ad2;
 }
 
-function buildIssueEmbed(payload: PlaneWebhookPayload, data: WebhookData, webBaseUrl: string): APIEmbed {
+async function buildIssueEmbed(
+  payload: PlaneWebhookPayload,
+  data: WebhookData,
+  webBaseUrl: string,
+  resolveAssignees?: AssigneeResolver
+): Promise<APIEmbed> {
   const action = ACTION_LABELS[payload.action] ?? payload.action;
   const identifier = typeof data.sequence_id === "number" ? `#${data.sequence_id}` : "Work item";
   const name = typeof data.name === "string" ? data.name : identifier;
@@ -112,9 +119,31 @@ function buildIssueEmbed(payload: PlaneWebhookPayload, data: WebhookData, webBas
   if (typeof data.priority === "string") {
     fields.push({ name: "Priority", value: data.priority, inline: true });
   }
-  const assigneeCount = Array.isArray(data.assignees) ? data.assignees.length : 0;
-  if (assigneeCount > 0) {
-    fields.push({ name: "Assignees", value: String(assigneeCount), inline: true });
+
+  const rawAssignees = data.assignees;
+  if (Array.isArray(rawAssignees) && rawAssignees.length > 0) {
+    const objectNames = rawAssignees
+      .map((assignee) => {
+        if (typeof assignee === "string") return undefined;
+        const record = asRecord(assignee);
+        return (record?.display_name as string) ?? (record?.email as string) ?? undefined;
+      })
+      .filter((value): value is string => Boolean(value));
+
+    let value: string;
+    if (objectNames.length === rawAssignees.length) {
+      value = objectNames.join(", ");
+    } else {
+      const ids = rawAssignees
+        .map((assignee) =>
+          typeof assignee === "string" ? assignee : ((asRecord(assignee)?.id as string) ?? undefined)
+        )
+        .filter((id): id is string => Boolean(id));
+      const projectId = typeof data.project === "string" ? data.project : undefined;
+      const names = resolveAssignees && ids.length ? await resolveAssignees(projectId, ids) : [];
+      value = (names.length ? names : ids).join(", ");
+    }
+    fields.push({ name: "Assignees", value: truncate(value, 1024), inline: true });
   }
 
   const activity = payload.activity;
@@ -186,10 +215,10 @@ function buildGenericEmbed(payload: PlaneWebhookPayload, data: WebhookData): API
  * Convert a Plane webhook payload into a Discord message. Returns `null` when
  * the payload carries nothing worth posting (e.g. an unsupported event).
  */
-export function buildWebhookMessage(
+export async function buildWebhookMessage(
   payload: PlaneWebhookPayload,
-  options: { webBaseUrl: string }
-): { embeds: APIEmbed[] } | null {
+  options: { webBaseUrl: string; resolveAssignees?: AssigneeResolver }
+): Promise<{ embeds: APIEmbed[] } | null> {
   const data = asRecord(payload.data);
   if (!data) {
     return null;
@@ -197,7 +226,7 @@ export function buildWebhookMessage(
 
   switch (payload.event) {
     case "issue":
-      return { embeds: [buildIssueEmbed(payload, data, options.webBaseUrl)] };
+      return { embeds: [await buildIssueEmbed(payload, data, options.webBaseUrl, options.resolveAssignees)] };
     case "issue_comment":
       return { embeds: [buildCommentEmbed(payload, data, options.webBaseUrl)] };
     case "project":

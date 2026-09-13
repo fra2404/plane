@@ -19,4 +19,5 @@ export interface AppContext {
   mirrorMessages: boolean;
   autoThreads: boolean;
   threadAutoArchiveMinutes: number;
+  userMapping: Record<string, string>;
 }

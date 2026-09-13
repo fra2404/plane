@@ -50,9 +50,15 @@ const issueCommand = new SlashCommandBuilder()
   .addSubcommand((sub) =>
     sub
       .setName("list")
-      .setDescription("List recent work items in a project")
+      .setDescription("List work items in a project (defaults to yours)")
       .addStringOption((option) =>
         option.setName("project").setDescription("Plane project").setRequired(true).setAutocomplete(true)
+      )
+      .addStringOption((option) =>
+        option
+          .setName("assignee")
+          .setDescription("Filter by assignee (default: you). Choose All to see everyone.")
+          .setAutocomplete(true)
       )
       .addIntegerOption((option) =>
         option.setName("limit").setDescription("How many work items to show (1-25)").setMinValue(1).setMaxValue(25)
@@ -120,6 +126,56 @@ function stateName(workItem: PlaneWorkItem): string {
   return workItem.state?.name ?? "—";
 }
 
+function assigneeIds(workItem: PlaneWorkItem): string[] {
+  const list = workItem.assignees;
+  if (!Array.isArray(list)) return [];
+  return list.map((assignee) => (typeof assignee === "string" ? assignee : assignee.id));
+}
+
+function assigneeNames(workItem: PlaneWorkItem): string | undefined {
+  const list = workItem.assignees;
+  if (!Array.isArray(list) || list.length === 0) return undefined;
+  const names = list.map((assignee) =>
+    typeof assignee === "string" ? assignee : (assignee.display_name ?? assignee.email ?? assignee.id)
+  );
+  return names.join(", ");
+}
+
+/**
+ * Map a Discord user to a Plane project member using `DISCORD_USER_MAPPING`.
+ * Keys can be the Discord user id, username or tag; values can be the Plane
+ * member UUID or the member email address.
+ */
+async function resolveDiscordMemberId(
+  interaction: ChatInputCommandInteraction,
+  projectId: string,
+  deps: CommandDeps
+): Promise<string | undefined> {
+  const mapping = deps.userMapping ?? {};
+  if (Object.keys(mapping).length === 0) return undefined;
+
+  const lookup = new Map(Object.entries(mapping).map(([key, value]) => [key.toLowerCase(), value]));
+  const candidates = [interaction.user.id, interaction.user.username, interaction.user.tag]
+    .filter(Boolean)
+    .map((value) => String(value).toLowerCase());
+
+  const mapped = candidates.map((key) => lookup.get(key)).find(Boolean);
+  if (!mapped) return undefined;
+
+  if (mapped.includes("@")) {
+    try {
+      const members = await deps.plane.listProjectMembers(projectId);
+      const match = members.find(({ member }) => (member.email ?? "").toLowerCase() === mapped.toLowerCase());
+      return match?.member.id;
+    } catch (error) {
+      logger.warn(`DISCORD_COMMANDS: Unable to resolve member by email "${mapped}"`, error);
+      return undefined;
+    }
+  }
+
+  return mapped;
+}
+
 function workItemToEmbed(workItem: PlaneWorkItem, webBaseUrl: string, workspaceSlug: string): APIEmbed {
   const identifier = `#${workItem.sequence_id}`;
   const projectId = workItem.project ?? workItem.project_detail?.id;
@@ -127,6 +183,11 @@ function workItemToEmbed(workItem: PlaneWorkItem, webBaseUrl: string, workspaceS
     { name: "State", value: stateName(workItem), inline: true },
     { name: "Priority", value: workItem.priority ?? "none", inline: true },
   ];
+
+  const names = assigneeNames(workItem);
+  if (names) {
+    fields.push({ name: "Assignees", value: names.slice(0, 1024), inline: true });
+  }
 
   return {
     title: `${identifier} · ${workItem.name}`.slice(0, 256),
@@ -191,9 +252,20 @@ async function handleAutocomplete(interaction: AutocompleteInteraction, deps: Co
       return;
     }
     const members = await deps.plane.listProjectMembers(projectId);
+    const isListFilter = interaction.options.getSubcommand(false) === "list";
+    const special: { name: string; value: string }[] = [];
+    if (
+      isListFilter &&
+      (!query || "assigned to me".includes(query) || "me".includes(query) || "mine".includes(query))
+    ) {
+      special.push({ name: "Assigned to me", value: "__me__" });
+    }
+    if (isListFilter && (!query || "all".includes(query) || "everyone".includes(query) || "tutti".includes(query))) {
+      special.push({ name: "All members", value: "__all__" });
+    }
     const matches = members
       .filter(({ member }) => `${member.display_name ?? ""} ${member.email ?? ""}`.toLowerCase().includes(query))
-      .slice(0, 25)
+      .slice(0, Math.max(0, 25 - special.length))
       .map(({ member }) => ({
         name: (member.email
           ? `${member.display_name ?? member.email} <${member.email}>`
@@ -201,7 +273,7 @@ async function handleAutocomplete(interaction: AutocompleteInteraction, deps: Co
         ).slice(0, 100),
         value: member.id,
       }));
-    await interaction.respond(matches);
+    await interaction.respond([...special, ...matches]);
     return;
   }
 
@@ -238,17 +310,48 @@ async function handleIssueCreate(interaction: ChatInputCommandInteraction, deps:
 async function handleIssueList(interaction: ChatInputCommandInteraction, deps: CommandDeps): Promise<void> {
   const projectId = interaction.options.getString("project", true);
   const limit = interaction.options.getInteger("limit") ?? 10;
+  const assigneeOption = interaction.options.getString("assignee");
 
   await interaction.deferReply();
 
   const [project, workItems] = await Promise.all([
     deps.plane.getProject(projectId),
-    deps.plane.listWorkItems(projectId, { perPage: limit }),
+    deps.plane.listWorkItems(projectId, { perPage: Math.max(limit, 25) }),
   ]);
 
-  const lines = workItems.map((item) => `• #${item.sequence_id} ${item.name} — ${stateName(item)}`);
+  let targetMemberId: string | undefined;
+  let label = "all members";
+
+  if (assigneeOption === "__all__") {
+    label = "all members";
+  } else if (assigneeOption && assigneeOption !== "__me__") {
+    targetMemberId = assigneeOption;
+    try {
+      const members = await deps.plane.listProjectMembers(projectId);
+      const member = members.find(({ member: candidate }) => candidate.id === targetMemberId)?.member;
+      label = member?.display_name ?? member?.email ?? "selected member";
+    } catch {
+      label = "selected member";
+    }
+  } else {
+    const mapped = await resolveDiscordMemberId(interaction, projectId, deps);
+    if (mapped) {
+      targetMemberId = mapped;
+      label = "you";
+    } else {
+      label = "all members (no Discord→Plane mapping for you)";
+    }
+  }
+
+  const filtered = targetMemberId ? workItems.filter((item) => assigneeIds(item).includes(targetMemberId)) : workItems;
+
+  const slice = filtered.slice(0, limit);
+  const lines = slice.map(
+    (item) => `• #${item.sequence_id} ${item.name} — ${stateName(item)} — ${assigneeNames(item) ?? "unassigned"}`
+  );
+
   await interaction.editReply({
-    content: `**${project.identifier} · recent work items**\n${lines.join("\n") || "No work items found."}`,
+    content: `**${project.identifier} · work items (${label})**\n${lines.join("\n") || "No work items found."}`,
   });
 }
 

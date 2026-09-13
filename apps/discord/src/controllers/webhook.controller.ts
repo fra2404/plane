@@ -73,8 +73,23 @@ export class WebhookController {
     }
   }
 
-  private buildMessage(payload: PlaneWebhookPayload): { embeds: APIEmbed[] } | null {
-    return buildWebhookMessage(payload, { webBaseUrl: this.context.webBaseUrl });
+  private async resolveAssignees(projectId: string | undefined, ids: string[]): Promise<string[]> {
+    if (!projectId || ids.length === 0) return [];
+    try {
+      const members = await this.context.plane.listProjectMembers(projectId);
+      const names = new Map(members.map(({ member }) => [member.id, member.display_name ?? member.email ?? member.id]));
+      return ids.map((id) => names.get(id) ?? id);
+    } catch (error) {
+      logger.warn("DISCORD_WEBHOOK: Unable to resolve assignee names", error);
+      return [];
+    }
+  }
+
+  private async buildMessage(payload: PlaneWebhookPayload): Promise<{ embeds: APIEmbed[] } | null> {
+    return buildWebhookMessage(payload, {
+      webBaseUrl: this.context.webBaseUrl,
+      resolveAssignees: (projectId, ids) => this.resolveAssignees(projectId, ids),
+    });
   }
 
   private async dispatch(payload: PlaneWebhookPayload): Promise<void> {
@@ -89,7 +104,7 @@ export class WebhookController {
       return;
     }
 
-    const message = this.buildMessage(payload);
+    const message = await this.buildMessage(payload);
     if (!message) {
       return;
     }
@@ -112,7 +127,7 @@ export class WebhookController {
     const issueId = typeof data?.issue === "string" ? data.issue : undefined;
     const link = issueId ? await this.context.linkStore.getByIssue(issueId) : undefined;
 
-    const message = this.buildMessage(payload);
+    const message = await this.buildMessage(payload);
     if (!message) {
       return;
     }

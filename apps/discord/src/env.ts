@@ -58,6 +58,7 @@ const envSchema = z.object({
   DISCORD_GUILD_ID: z.string().optional(),
   DISCORD_DEFAULT_CHANNEL_ID: z.string().optional(),
   DISCORD_CHANNEL_MAPPING: jsonRecord,
+  DISCORD_USER_MAPPING: jsonRecord,
   DISCORD_AUTO_THREADS: booleanish,
   DISCORD_MIRROR_MESSAGES: booleanish,
   DISCORD_THREAD_AUTO_ARCHIVE_MINUTES: z

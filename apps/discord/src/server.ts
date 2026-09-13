@@ -54,6 +54,7 @@ export class Server {
         mirrorMessages: env.DISCORD_MIRROR_MESSAGES,
         autoThreads: env.DISCORD_AUTO_THREADS,
         threadAutoArchiveMinutes: env.DISCORD_THREAD_AUTO_ARCHIVE_MINUTES,
+        userMapping: env.DISCORD_USER_MAPPING,
       };
 
       this.bot = new DiscordBot(this.context);
