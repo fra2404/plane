@@ -169,14 +169,13 @@ export class WebhookController {
   }
 
   private async dispatch(payload: PlaneWebhookPayload): Promise<void> {
-    const channelId = await this.mapper.resolve(payload);
-    if (!channelId) {
-      logger.info(`DISCORD_WEBHOOK: No channel mapped for event "${payload.event}"`);
-      return;
-    }
-
     if (payload.event === "issue_comment") {
-      await this.dispatchComment(payload, channelId);
+      const commentChannelId = await this.mapper.resolve(payload);
+      if (!commentChannelId) {
+        logger.info(`DISCORD_WEBHOOK: No channel mapped for event "${payload.event}"`);
+        return;
+      }
+      await this.dispatchComment(payload, commentChannelId);
       return;
     }
 
@@ -186,18 +185,15 @@ export class WebhookController {
     }
 
     const assignedMemberIds = this.assignedMemberIds(payload);
-    const discordUserIds =
-      (this.context.mentionAssignee || this.context.dmAssignee) && assignedMemberIds.length
-        ? await this.resolveDiscordUserIds(extractProjectId(payload), assignedMemberIds)
-        : [];
+    const discordUserIds = assignedMemberIds.length
+      ? await this.resolveDiscordUserIds(extractProjectId(payload), assignedMemberIds)
+      : [];
+    const isAssignment = discordUserIds.length > 0;
+    const delivery = this.context.assignDelivery;
 
-    if (discordUserIds.length && this.context.mentionAssignee) {
-      message.content = `${discordUserIds.map((id) => `<@${id}>`).join(" ")} Ti è stato assegnato un task`;
-    }
-
-    const sent = await sendChannelMessage(this.bot.client, channelId, message);
-
-    if (discordUserIds.length && this.context.dmAssignee) {
+    // Assignments are delivered privately (DM) by default so a person's work
+    // items are not broadcast to everyone in the project channel.
+    if (isAssignment && delivery !== "channel") {
       await Promise.all(
         discordUserIds.map((userId) =>
           sendDirectMessage(this.bot.client, userId, {
@@ -207,6 +203,23 @@ export class WebhookController {
         )
       );
     }
+
+    const postToChannel = isAssignment ? delivery !== "dm" : true;
+    if (!postToChannel) {
+      return;
+    }
+
+    const channelId = await this.mapper.resolve(payload);
+    if (!channelId) {
+      logger.info(`DISCORD_WEBHOOK: No channel mapped for event "${payload.event}"`);
+      return;
+    }
+
+    if (isAssignment) {
+      message.content = `${discordUserIds.map((id) => `<@${id}>`).join(" ")} Ti è stato assegnato un task`;
+    }
+
+    const sent = await sendChannelMessage(this.bot.client, channelId, message);
 
     const isCreate = payload.action === "create" || payload.action === "created";
     if (this.context.autoThreads && payload.event === "issue" && isCreate && sent) {

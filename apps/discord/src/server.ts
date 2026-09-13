@@ -55,8 +55,7 @@ export class Server {
         autoThreads: env.DISCORD_AUTO_THREADS,
         threadAutoArchiveMinutes: env.DISCORD_THREAD_AUTO_ARCHIVE_MINUTES,
         userMapping: env.DISCORD_USER_MAPPING,
-        mentionAssignee: env.DISCORD_MENTION_ASSIGNEE,
-        dmAssignee: env.DISCORD_DM_ASSIGNEE,
+        assignDelivery: env.DISCORD_ASSIGN_DELIVERY as "dm" | "channel" | "both",
       };
 
       this.bot = new DiscordBot(this.context);

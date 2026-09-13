@@ -20,6 +20,5 @@ export interface AppContext {
   autoThreads: boolean;
   threadAutoArchiveMinutes: number;
   userMapping: Record<string, string>;
-  mentionAssignee: boolean;
-  dmAssignee: boolean;
+  assignDelivery: "dm" | "channel" | "both";
 }

@@ -61,8 +61,14 @@ const envSchema = z.object({
   DISCORD_USER_MAPPING: jsonRecord,
   DISCORD_AUTO_THREADS: booleanish,
   DISCORD_MIRROR_MESSAGES: booleanish,
-  DISCORD_MENTION_ASSIGNEE: booleanish,
-  DISCORD_DM_ASSIGNEE: booleanish,
+  // Where assignment notifications go: "dm" (private, default), "channel" or "both".
+  DISCORD_ASSIGN_DELIVERY: z
+    .string()
+    .default("dm")
+    .transform((value) => value.trim().toLowerCase())
+    .refine((value) => ["dm", "channel", "both"].includes(value), {
+      message: "DISCORD_ASSIGN_DELIVERY must be one of dm, channel, both",
+    }),
   DISCORD_THREAD_AUTO_ARCHIVE_MINUTES: z
     .string()
     .default("1440")
