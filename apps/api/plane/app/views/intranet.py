@@ -9,7 +9,7 @@ from plane.app.permissions import ROLE, allow_permission
 from plane.app.serializers import IntranetDeviceSerializer, IntranetLinkSerializer, IntranetNewsSerializer
 from plane.db.models import IntranetDevice, IntranetLink, IntranetNews, Workspace
 
-from ..base import BaseViewSet
+from .base import BaseViewSet
 
 
 class IntranetDeviceViewSet(BaseViewSet):
