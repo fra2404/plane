@@ -30,9 +30,12 @@ import { isStaleAssetError, recoverFromStaleAsset } from "@/lib/stale-asset-erro
 import { CustomErrorComponent } from "./error";
 import { AppProvider } from "./provider";
 // fonts
+// eslint-disable-next-line import/no-unassigned-import
 import "@fontsource-variable/inter";
 import interVariableWoff2 from "@fontsource-variable/inter/files/inter-latin-wght-normal.woff2?url";
+// eslint-disable-next-line import/no-unassigned-import
 import "@fontsource/material-symbols-rounded";
+// eslint-disable-next-line import/no-unassigned-import
 import "@fontsource/ibm-plex-mono";
 
 const APP_TITLE = "Plane | Simple, extensible, open-source project management tool.";
@@ -41,7 +44,6 @@ export const links: LinksFunction = () => [
   { rel: "icon", type: "image/png", sizes: "32x32", href: favicon32 },
   { rel: "icon", type: "image/png", sizes: "16x16", href: favicon16 },
   { rel: "shortcut icon", href: faviconIco },
-  { rel: "manifest", href: "/site.webmanifest.json" },
   { rel: "apple-touch-icon", href: icon512 },
   { rel: "apple-touch-icon", sizes: "180x180", href: icon180 },
   { rel: "apple-touch-icon", sizes: "512x512", href: icon512 },
@@ -82,6 +84,10 @@ export function Layout({ children }: { children: ReactNode }) {
           {children}
         </ThemeProvider>
         <Scripts />
+        {/* Register the service worker so the web app is installable as a PWA */}
+        <Script id="sw-register">
+          {`if ('serviceWorker' in navigator) { window.addEventListener('load', function () { navigator.serviceWorker.register('/sw.js').catch(function () {}); }); }`}
+        </Script>
         {!!isSessionRecorderEnabled && process.env.VITE_SESSION_RECORDER_KEY && (
           <Script id="clarity-tracking">
             {`(function(c,l,a,r,i,t,y){
