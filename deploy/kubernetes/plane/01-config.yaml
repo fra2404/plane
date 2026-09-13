@@ -51,5 +51,7 @@ data:
   AWS_S3_ENDPOINT_URL: http://plane-minio:9000
   FILE_SIZE_LIMIT: "5242880"
   SIGNED_URL_EXPIRATION: "3600"
+  # Allow webhooks pointing to our own domain (e.g. the /discord relay)
+  WEBHOOK_ALLOWED_HOSTS: plane.algios.dev
   API_KEY_RATE_LIMIT: 60/minute
   GUNICORN_WORKERS: "3"
