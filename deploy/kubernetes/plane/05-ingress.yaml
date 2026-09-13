@@ -12,6 +12,13 @@ spec:
     - host: plane.algios.dev
       http:
         paths:
+          - path: /discord
+            pathType: Prefix
+            backend:
+              service:
+                name: discord
+                port:
+                  number: 3200
           - path: /
             pathType: Prefix
             backend:

@@ -46,7 +46,31 @@ echo "==> Config, data stores, application, ingress"
 kubectl apply -f "$DIR/01-config.yaml"
 kubectl apply -f "$DIR/03-data.yaml"
 kubectl apply -f "$DIR/04-plane.yaml"
+
+echo "==> Discord bot secret"
+# Prefer the local apps/discord/.env, fall back to the current environment.
+DISCORD_ENV_FILE="${DISCORD_ENV_FILE:-$DIR/../../../apps/discord/.env}"
+if [[ -f "$DISCORD_ENV_FILE" ]]; then
+  set -a
+  # shellcheck disable=SC1090
+  source "$DISCORD_ENV_FILE"
+  set +a
+fi
+
+if [[ -n "${DISCORD_BOT_TOKEN:-}" && -n "${PLANE_API_TOKEN:-}" ]]; then
+  kubectl create secret generic discord-secrets \
+    --namespace "$NAMESPACE" \
+    --from-literal=DISCORD_BOT_TOKEN="$DISCORD_BOT_TOKEN" \
+    --from-literal=PLANE_API_TOKEN="$PLANE_API_TOKEN" \
+    --from-literal=PLANE_WEBHOOK_SECRETS="${PLANE_WEBHOOK_SECRETS:-{\}}" \
+    --from-literal=PLANE_WEBHOOK_SECRET="${PLANE_WEBHOOK_SECRET:-}" \
+    --dry-run=client -o yaml | kubectl apply -f -
+else
+  echo "    DISCORD_BOT_TOKEN/PLANE_API_TOKEN not set, skipping. Create discord-secrets manually."
+fi
+
 kubectl apply -f "$DIR/05-ingress.yaml"
+kubectl apply -f "$DIR/06-discord.yaml"
 
 echo "==> Done. Watch rollouts with:"
 echo "    kubectl -n $NAMESPACE get pods -w"

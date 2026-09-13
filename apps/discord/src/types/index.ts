@@ -1,0 +1,83 @@
+/**
+ * Copyright (c) 2023-present Plane Software, Inc. and contributors
+ * SPDX-License-Identifier: AGPL-3.0-only
+ * See the LICENSE file for details.
+ */
+
+export type PlanePriority = "urgent" | "high" | "medium" | "low" | "none";
+
+export interface PlaneProject {
+  id: string;
+  identifier: string;
+  name: string;
+  description?: string;
+}
+
+export interface PlaneState {
+  id: string;
+  name: string;
+  color: string;
+  group: "backlog" | "unstarted" | "started" | "completed" | "cancelled" | string;
+}
+
+export interface PlaneUser {
+  id: string;
+  display_name?: string;
+  email?: string;
+  avatar_url?: string | null;
+}
+
+export interface PlaneWorkItem {
+  id: string;
+  name: string;
+  sequence_id: number;
+  priority?: PlanePriority;
+  state?: PlaneState | string | null;
+  assignees?: string[] | PlaneUser[];
+  description_html?: string | null;
+  project?: string;
+  project_detail?: PlaneProject;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface PlaneProjectMember {
+  id: string;
+  member: PlaneUser;
+}
+
+export interface PlaneComment {
+  id: string;
+  comment_html: string;
+  comment_stripped?: string;
+}
+
+export interface Paginated<T> {
+  results: T[];
+  next?: string | null;
+  previous?: string | null;
+  total_count?: number;
+}
+
+export type PlaneWebhookEvent = "project" | "issue" | "module" | "cycle" | "issue_comment" | (string & {});
+
+export type PlaneWebhookAction = "create" | "update" | "delete";
+
+export interface PlaneWebhookActivity {
+  field?: string | null;
+  old_value?: unknown;
+  new_value?: unknown;
+  actor?: PlaneUser | null;
+  old_identifier?: string | null;
+  new_identifier?: string | null;
+}
+
+export interface PlaneWebhookPayload<T = Record<string, unknown>> {
+  event: PlaneWebhookEvent;
+  action: PlaneWebhookAction;
+  webhook_id: string;
+  workspace_id: string;
+  workspace_slug: string;
+  data: T | null;
+  activity: PlaneWebhookActivity | null;
+}

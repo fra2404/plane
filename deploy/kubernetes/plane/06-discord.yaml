@@ -1,0 +1,84 @@
+# Plane <-> Discord bot (webhook bridge + slash commands)
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: discord-config
+  namespace: plane
+data:
+  LOG_LEVEL: info
+  PORT: "3200"
+  API_BASE_PATH: /discord
+  CORS_ALLOWED_ORIGINS: https://plane.algios.dev
+  DISCORD_APPLICATION_ID: "1548491422301429780"
+  DISCORD_GUILD_ID: "1548625603433996388"
+  # key = Plane project identifier (or UUID) -> Discord channel id
+  DISCORD_CHANNEL_MAPPING: '{"ALGIOS":"1548625935866007552","SMILINGDOG":"1548625916014370877"}'
+  DISCORD_AUTO_THREADS: "true"
+  DISCORD_MIRROR_MESSAGES: "false"
+  DISCORD_THREAD_AUTO_ARCHIVE_MINUTES: "1440"
+  PLANE_API_BASE_URL: https://plane.algios.dev
+  PLANE_WORKSPACE_SLUG: algios
+  PLANE_WEB_BASE_URL: https://plane.algios.dev
+  # Dedicated Redis DB index so it does not collide with Plane.
+  REDIS_URL: redis://plane-redis:6379/1
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: discord
+  namespace: plane
+spec:
+  selector:
+    app: plane-discord
+  ports:
+    - name: http
+      port: 3200
+      targetPort: 3200
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: plane-discord
+  namespace: plane
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: plane-discord
+  template:
+    metadata:
+      labels:
+        app: plane-discord
+    spec:
+      imagePullSecrets:
+        - name: ghcr-plane
+      containers:
+        - name: discord
+          image: ghcr.io/fra2404/plane-discord:v1.4.2-worklog
+          imagePullPolicy: Always
+          envFrom:
+            - configMapRef:
+                name: discord-config
+            - secretRef:
+                name: discord-secrets
+          ports:
+            - containerPort: 3200
+          readinessProbe:
+            httpGet:
+              path: /discord/health/
+              port: 3200
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          livenessProbe:
+            httpGet:
+              path: /discord/health/
+              port: 3200
+            initialDelaySeconds: 30
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              memory: 512Mi
