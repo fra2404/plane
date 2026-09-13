@@ -29,7 +29,10 @@ from plane.authentication.adapter.error import (
     AuthenticationException,
 )
 from plane.authentication.adapter.oauth import OauthAdapter
+from plane.db.models import Workspace, WorkspaceMember
+from plane.license.models import Instance, InstanceAdmin
 from plane.license.utils.instance_value import get_configuration_value
+from plane.utils.cache import invalidate_cache_directly
 from plane.utils.host import base_host
 
 # Discovery documents change rarely; cache them so every login does not pay
@@ -91,6 +94,7 @@ class OIDCOAuthProvider(OauthAdapter):
         self.nonce = nonce
         self.code_verifier = code_verifier
         self.id_token_claims = {}
+        self.oidc_claims = {}
 
         discovery = self._get_discovery_document()
         # The ``iss`` claim must match the issuer exactly as the provider
@@ -339,6 +343,7 @@ class OIDCOAuthProvider(OauthAdapter):
 
     def set_user_data(self):
         claims = {**self.id_token_claims, **self._get_userinfo_claims()}
+        self.oidc_claims = claims
 
         email = claims.get("email")
         if not email:
@@ -379,3 +384,102 @@ class OIDCOAuthProvider(OauthAdapter):
                 },
             }
         )
+
+    # ------------------------------------------------------------------ #
+    # Group -> role sync (Authentik groups)
+    # ------------------------------------------------------------------ #
+    def complete_login_or_signup(self):
+        user = super().complete_login_or_signup()
+        try:
+            self._sync_groups_to_roles(user)
+        except Exception:  # noqa: BLE001
+            # Never block login because role sync failed.
+            self.logger.exception("OIDC group/role sync failed")
+        return user
+
+    def _sync_groups_to_roles(self, user):
+        (
+            groups_claim_name,
+            admin_groups_raw,
+            default_role_raw,
+            auto_join_raw,
+            workspace_slugs_raw,
+            instance_admin_groups_raw,
+            grant_instance_admin_raw,
+        ) = get_configuration_value(
+            [
+                {"key": "OIDC_GROUPS_CLAIM", "default": os.environ.get("OIDC_GROUPS_CLAIM", "groups")},
+                {"key": "OIDC_ADMIN_GROUPS", "default": os.environ.get("OIDC_ADMIN_GROUPS", "admin")},
+                {"key": "OIDC_DEFAULT_ROLE", "default": os.environ.get("OIDC_DEFAULT_ROLE", "15")},
+                {
+                    "key": "OIDC_AUTO_JOIN_WORKSPACES",
+                    "default": os.environ.get("OIDC_AUTO_JOIN_WORKSPACES", "1"),
+                },
+                {"key": "OIDC_WORKSPACE_SLUGS", "default": os.environ.get("OIDC_WORKSPACE_SLUGS", "")},
+                {
+                    "key": "OIDC_INSTANCE_ADMIN_GROUPS",
+                    "default": os.environ.get("OIDC_INSTANCE_ADMIN_GROUPS", os.environ.get("OIDC_ADMIN_GROUPS", "admin")),
+                },
+                {
+                    "key": "OIDC_GRANT_INSTANCE_ADMIN",
+                    "default": os.environ.get("OIDC_GRANT_INSTANCE_ADMIN", "0"),
+                },
+            ]
+        )
+
+        raw_groups = self.oidc_claims.get(groups_claim_name) or []
+        if isinstance(raw_groups, str):
+            raw_groups = [raw_groups]
+        group_set = {str(group).strip().lower() for group in raw_groups if str(group).strip()}
+
+        admin_groups = {group.strip().lower() for group in str(admin_groups_raw or "").split(",") if group.strip()}
+        is_admin = bool(group_set & admin_groups)
+
+        try:
+            default_role = int(default_role_raw)
+        except (TypeError, ValueError):
+            default_role = 15
+        if default_role not in (5, 15, 20):
+            default_role = 15
+        role = 20 if is_admin else default_role
+
+        workspace_slugs = [slug.strip() for slug in str(workspace_slugs_raw or "").split(",") if slug.strip()]
+        auto_join = str(auto_join_raw) == "1"
+
+        self.logger.info(
+            "OIDC group sync: groups=%s admin=%s role=%s workspaces=%s auto_join=%s",
+            sorted(group_set),
+            is_admin,
+            role,
+            workspace_slugs,
+            auto_join,
+        )
+
+        for workspace in Workspace.objects.filter(slug__in=workspace_slugs, deleted_at__isnull=True):
+            member = WorkspaceMember.objects.filter(workspace=workspace, member=user).first()
+            if member:
+                if member.role != role:
+                    member.role = role
+                    member.save(update_fields=["role"])
+            elif auto_join:
+                WorkspaceMember.objects.create(workspace=workspace, member=user, role=role)
+            else:
+                continue
+            invalidate_cache_directly(
+                path=f"/api/workspaces/{workspace.slug}/members/",
+                url_params=False,
+                user=False,
+                multiple=True,
+            )
+
+        # Optionally grant InstanceAdmin (god-mode) to members of the admin group.
+        if str(grant_instance_admin_raw) == "1":
+            instance_admin_groups = {
+                group.strip().lower()
+                for group in str(instance_admin_groups_raw or "").split(",")
+                if group.strip()
+            }
+            if group_set & instance_admin_groups:
+                instance = Instance.objects.first()
+                if instance:
+                    InstanceAdmin.objects.get_or_create(user=user, instance=instance)
