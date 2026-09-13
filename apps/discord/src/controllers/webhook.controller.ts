@@ -29,6 +29,22 @@ function resolveSecret(payload: PlaneWebhookPayload): string | undefined {
   return env.PLANE_WEBHOOK_SECRET || undefined;
 }
 
+/** Extract Plane member ids from an array of ids or expanded user objects. */
+function extractMemberIds(value: unknown): string[] {
+  if (typeof value === "string" && value) return [value];
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((entry) => {
+      if (typeof entry === "string") return entry;
+      if (entry && typeof entry === "object") {
+        const record = entry as Record<string, unknown>;
+        return (record.id as string | undefined) ?? (record.member as string | undefined);
+      }
+      return undefined;
+    })
+    .filter((id): id is string => Boolean(id));
+}
+
 @Controller("/webhooks")
 export class WebhookController {
   [key: string]: unknown;
@@ -98,19 +114,15 @@ export class WebhookController {
     const data = payload.data as Record<string, unknown> | null;
 
     if (payload.action === "create") {
-      const assignees = data?.assignees;
-      if (!Array.isArray(assignees)) return [];
-      return assignees
-        .map((assignee) =>
-          typeof assignee === "string" ? assignee : ((assignee as Record<string, unknown>)?.id as string | undefined)
-        )
-        .filter((id): id is string => Boolean(id));
+      return extractMemberIds(data?.assignees);
     }
 
-    // On update Plane records an IssueActivity with field "assignees" and the
-    // added member in new_identifier (removals set old_identifier instead).
-    if (payload.action === "update" && payload.activity?.field === "assignees" && payload.activity.new_identifier) {
-      return [String(payload.activity.new_identifier)];
+    // On update Plane's webhook activity carries the changed field plus the old
+    // and new values, e.g. field "assignees"/"assignee_ids".
+    const field = String(payload.activity?.field ?? "").toLowerCase();
+    if (payload.action === "update" && field.includes("assign")) {
+      const oldIds = new Set(extractMemberIds(payload.activity?.old_value));
+      return extractMemberIds(payload.activity?.new_value).filter((id) => !oldIds.has(id));
     }
 
     return [];
@@ -177,7 +189,7 @@ export class WebhookController {
         : [];
 
     if (discordUserIds.length && this.context.mentionAssignee) {
-      message.content = discordUserIds.map((id) => `<@${id}>`).join(" ");
+      message.content = `${discordUserIds.map((id) => `<@${id}>`).join(" ")} Ti è stato assegnato un task`;
     }
 
     const sent = await sendChannelMessage(this.bot.client, channelId, message);
@@ -186,7 +198,7 @@ export class WebhookController {
       await Promise.all(
         discordUserIds.map((userId) =>
           sendDirectMessage(this.bot.client, userId, {
-            content: "A Plane work item was assigned to you",
+            content: "Ti è stato assegnato un task",
             embeds: message.embeds,
           })
         )
