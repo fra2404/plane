@@ -16,6 +16,7 @@ spec:
       containers:
         - name: migrator
           image: ghcr.io/fra2404/plane-backend:v1.4.2-worklog
+          imagePullPolicy: Always
           command: ["./bin/docker-entrypoint-migrator.sh"]
           envFrom:
             - configMapRef:
@@ -39,6 +40,7 @@ spec:
       containers:
         - name: create-bucket
           image: ghcr.io/fra2404/plane-backend:v1.4.2-worklog
+          imagePullPolicy: Always
           command: ["python", "manage.py", "create_bucket"]
           envFrom:
             - configMapRef:
@@ -86,6 +88,7 @@ spec:
       containers:
         - name: api
           image: ghcr.io/fra2404/plane-backend:v1.4.2-worklog
+          imagePullPolicy: Always
           command: ["./bin/docker-entrypoint-api.sh"]
           envFrom:
             - configMapRef:
@@ -126,6 +129,7 @@ spec:
       containers:
         - name: worker
           image: ghcr.io/fra2404/plane-backend:v1.4.2-worklog
+          imagePullPolicy: Always
           command: ["./bin/docker-entrypoint-worker.sh"]
           envFrom:
             - configMapRef:
@@ -159,6 +163,7 @@ spec:
       containers:
         - name: beat
           image: ghcr.io/fra2404/plane-backend:v1.4.2-worklog
+          imagePullPolicy: Always
           command: ["./bin/docker-entrypoint-beat.sh"]
           envFrom:
             - configMapRef:
@@ -205,6 +210,7 @@ spec:
       containers:
         - name: web
           image: ghcr.io/fra2404/plane-frontend:v1.4.2-worklog
+          imagePullPolicy: Always
           ports:
             - containerPort: 3000
           readinessProbe:
@@ -245,6 +251,7 @@ spec:
       containers:
         - name: space
           image: ghcr.io/fra2404/plane-space:v1.4.2-worklog
+          imagePullPolicy: Always
           envFrom:
             - configMapRef:
                 name: plane-config

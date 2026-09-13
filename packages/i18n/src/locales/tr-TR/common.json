@@ -895,5 +895,6 @@
         "message": "Could not save the worklog. Please try again."
       }
     }
-  }
+  },
+  "intranet": "Intranet"
 }

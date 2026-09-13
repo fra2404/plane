@@ -66,6 +66,7 @@ from .user import Account, Profile, User, BotTypeEnum
 from .view import IssueView
 from .webhook import Webhook, WebhookLog
 from .worklog import IssueWorklog
+from .intranet import IntranetDevice, IntranetLink, IntranetNews
 from .workspace import (
     Workspace,
     WorkspaceBaseModel,
