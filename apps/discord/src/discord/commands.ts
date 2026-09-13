@@ -287,7 +287,7 @@ async function handleIssueCreate(interaction: ChatInputCommandInteraction, deps:
   const priority = interaction.options.getString("priority");
   const assigneeId = interaction.options.getString("assignee");
 
-  await interaction.deferReply();
+  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
   const input: CreateWorkItemInput = { name: title };
   if (description) {
@@ -312,7 +312,7 @@ async function handleIssueList(interaction: ChatInputCommandInteraction, deps: C
   const limit = interaction.options.getInteger("limit") ?? 10;
   const assigneeOption = interaction.options.getString("assignee");
 
-  await interaction.deferReply();
+  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
   const [project, workItems] = await Promise.all([
     deps.plane.getProject(projectId),
@@ -357,7 +357,7 @@ async function handleIssueList(interaction: ChatInputCommandInteraction, deps: C
 
 async function handleIssueView(interaction: ChatInputCommandInteraction, deps: CommandDeps): Promise<void> {
   const key = interaction.options.getString("id", true);
-  await interaction.deferReply();
+  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
   const workItem = await deps.plane.getWorkItemByKey(key);
   await interaction.editReply({ embeds: [workItemToEmbed(workItem, deps.webBaseUrl, deps.workspaceSlug)] });
 }
@@ -383,7 +383,7 @@ async function handleIssueUpdate(interaction: ChatInputCommandInteraction, deps:
   const key = interaction.options.getString("id", true);
   const state = interaction.options.getString("state", true);
 
-  await interaction.deferReply();
+  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
   const workItem = await deps.plane.getWorkItemByKey(key);
   const projectId = workItem.project ?? workItem.project_detail?.id;
@@ -403,7 +403,7 @@ async function handleIssueAssign(interaction: ChatInputCommandInteraction, deps:
   const key = interaction.options.getString("id", true);
   const assigneeId = interaction.options.getString("assignee", true);
 
-  await interaction.deferReply();
+  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
   const workItem = await deps.plane.getWorkItemByKey(key);
   const projectId = workItem.project ?? workItem.project_detail?.id;
@@ -422,7 +422,7 @@ async function handleIssueAssign(interaction: ChatInputCommandInteraction, deps:
 async function handleIssueUnassign(interaction: ChatInputCommandInteraction, deps: CommandDeps): Promise<void> {
   const key = interaction.options.getString("id", true);
 
-  await interaction.deferReply();
+  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
   const workItem = await deps.plane.getWorkItemByKey(key);
   const projectId = workItem.project ?? workItem.project_detail?.id;
@@ -461,7 +461,7 @@ async function handleIssue(interaction: ChatInputCommandInteraction, deps: Comma
 
 async function handleStatus(interaction: ChatInputCommandInteraction, deps: CommandDeps): Promise<void> {
   const projectId = interaction.options.getString("project", true);
-  await interaction.deferReply();
+  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
   const [project, states, workItems] = await Promise.all([
     deps.plane.getProject(projectId),
