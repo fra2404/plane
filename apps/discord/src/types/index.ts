@@ -56,7 +56,7 @@ export interface Paginated<T> {
 
 export type PlaneWebhookEvent = "project" | "issue" | "module" | "cycle" | "issue_comment" | (string & {});
 
-export type PlaneWebhookAction = "create" | "update" | "delete";
+export type PlaneWebhookAction = "created" | "updated" | "deleted" | "create" | "update" | "delete";
 
 export interface PlaneWebhookActivity {
   field?: string | null;

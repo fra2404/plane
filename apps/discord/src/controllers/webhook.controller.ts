@@ -112,15 +112,18 @@ export class WebhookController {
   private assignedMemberIds(payload: PlaneWebhookPayload): string[] {
     if (payload.event !== "issue") return [];
     const data = payload.data as Record<string, unknown> | null;
+    const action = payload.action;
+    const isCreate = action === "create" || action === "created";
+    const isUpdate = action === "update" || action === "updated";
 
-    if (payload.action === "create") {
+    if (isCreate) {
       return extractMemberIds(data?.assignees);
     }
 
     // On update Plane's webhook activity carries the changed field plus the old
     // and new values, e.g. field "assignees"/"assignee_ids".
     const field = String(payload.activity?.field ?? "").toLowerCase();
-    if (payload.action === "update" && field.includes("assign")) {
+    if (isUpdate && field.includes("assign")) {
       const oldIds = new Set(extractMemberIds(payload.activity?.old_value));
       return extractMemberIds(payload.activity?.new_value).filter((id) => !oldIds.has(id));
     }
@@ -188,10 +191,6 @@ export class WebhookController {
         ? await this.resolveDiscordUserIds(extractProjectId(payload), assignedMemberIds)
         : [];
 
-    logger.info(
-      `DISCORD_WEBHOOK: assignment check event=${payload.event} action=${payload.action} field=${String(payload.activity?.field)} assigned=${JSON.stringify(assignedMemberIds)} discord=${JSON.stringify(discordUserIds)} mention=${this.context.mentionAssignee} dm=${this.context.dmAssignee}`
-    );
-
     if (discordUserIds.length && this.context.mentionAssignee) {
       message.content = `${discordUserIds.map((id) => `<@${id}>`).join(" ")} Ti è stato assegnato un task`;
     }
@@ -209,7 +208,8 @@ export class WebhookController {
       );
     }
 
-    if (this.context.autoThreads && payload.event === "issue" && payload.action === "create" && sent) {
+    const isCreate = payload.action === "create" || payload.action === "created";
+    if (this.context.autoThreads && payload.event === "issue" && isCreate && sent) {
       await this.createIssueThread(payload, sent, channelId);
     }
   }
