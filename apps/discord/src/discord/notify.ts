@@ -218,7 +218,7 @@ function buildGenericEmbed(payload: PlaneWebhookPayload, data: WebhookData): API
 export async function buildWebhookMessage(
   payload: PlaneWebhookPayload,
   options: { webBaseUrl: string; resolveAssignees?: AssigneeResolver }
-): Promise<{ embeds: APIEmbed[] } | null> {
+): Promise<{ embeds: APIEmbed[]; content?: string } | null> {
   const data = asRecord(payload.data);
   if (!data) {
     return null;
@@ -247,7 +247,7 @@ export async function buildWebhookMessage(
 export async function sendChannelMessage(
   client: Client,
   channelId: string,
-  message: { embeds: APIEmbed[] }
+  message: { embeds: APIEmbed[]; content?: string }
 ): Promise<Message | undefined> {
   try {
     const channel = await client.channels.fetch(channelId);
@@ -259,5 +259,22 @@ export async function sendChannelMessage(
   } catch (error) {
     logger.error(`DISCORD_NOTIFY: Failed to send message to channel ${channelId}`, error);
     return undefined;
+  }
+}
+
+/**
+ * Send a direct message to a Discord user. Failures (e.g. DMs closed) are
+ * logged and swallowed so webhook handling never fails because of a DM.
+ */
+export async function sendDirectMessage(
+  client: Client,
+  userId: string,
+  message: { embeds: APIEmbed[]; content?: string }
+): Promise<void> {
+  try {
+    const user = await client.users.fetch(userId);
+    await user.send(message);
+  } catch (error) {
+    logger.warn(`DISCORD_NOTIFY: Failed to send DM to user ${userId}`, error);
   }
 }

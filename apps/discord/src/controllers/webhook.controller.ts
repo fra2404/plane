@@ -10,12 +10,12 @@ import { Controller, Post } from "@plane/decorators";
 import { logger } from "@plane/logger";
 import type { AppContext } from "@/context";
 import type { DiscordBot } from "@/discord/client";
-import { buildWebhookMessage, sendChannelMessage } from "@/discord/notify";
+import { buildWebhookMessage, sendChannelMessage, sendDirectMessage } from "@/discord/notify";
 import { threadName } from "@/discord/threads";
 import { env } from "@/env";
 import { extractProjectId, type ChannelMapper } from "@/lib/mapping";
 import { verifyPlaneSignature } from "@/lib/signature";
-import type { PlaneWebhookPayload } from "@/types";
+import type { PlaneUser, PlaneWebhookPayload } from "@/types";
 
 interface RawBodyRequest extends Request {
   rawBody?: Buffer;
@@ -85,11 +85,72 @@ export class WebhookController {
     }
   }
 
-  private async buildMessage(payload: PlaneWebhookPayload): Promise<{ embeds: APIEmbed[] } | null> {
+  private async buildMessage(payload: PlaneWebhookPayload): Promise<{ embeds: APIEmbed[]; content?: string } | null> {
     return buildWebhookMessage(payload, {
       webBaseUrl: this.context.webBaseUrl,
       resolveAssignees: (projectId, ids) => this.resolveAssignees(projectId, ids),
     });
+  }
+
+  /** Plane member ids that were newly assigned by this event. */
+  private assignedMemberIds(payload: PlaneWebhookPayload): string[] {
+    if (payload.event !== "issue") return [];
+    const data = payload.data as Record<string, unknown> | null;
+
+    if (payload.action === "create") {
+      const assignees = data?.assignees;
+      if (!Array.isArray(assignees)) return [];
+      return assignees
+        .map((assignee) =>
+          typeof assignee === "string" ? assignee : ((assignee as Record<string, unknown>)?.id as string | undefined)
+        )
+        .filter((id): id is string => Boolean(id));
+    }
+
+    // On update Plane records an IssueActivity with field "assignees" and the
+    // added member in new_identifier (removals set old_identifier instead).
+    if (payload.action === "update" && payload.activity?.field === "assignees" && payload.activity.new_identifier) {
+      return [String(payload.activity.new_identifier)];
+    }
+
+    return [];
+  }
+
+  /** Map Plane member ids to Discord user ids using DISCORD_USER_MAPPING. */
+  private async resolveDiscordUserIds(projectId: string | undefined, memberIds: string[]): Promise<string[]> {
+    if (memberIds.length === 0) return [];
+    const mapping = this.context.userMapping ?? {};
+    // Mentions/DMs require a numeric Discord user id as the mapping key.
+    const entries = Object.entries(mapping).filter(([key]) => /^\d{5,}$/.test(key));
+    if (entries.length === 0) return [];
+
+    const memberIdSet = new Set(memberIds);
+    const result = new Set<string>();
+
+    const needsEmailLookup = entries.some(([, value]) => value.includes("@") && !memberIdSet.has(value));
+    let members: PlaneUser[] = [];
+    if (needsEmailLookup && projectId) {
+      try {
+        members = await this.context.plane.listProjectMembers(projectId);
+      } catch {
+        members = [];
+      }
+    }
+
+    for (const [discordId, value] of entries) {
+      if (memberIdSet.has(value)) {
+        result.add(discordId);
+        continue;
+      }
+      if (value.includes("@")) {
+        const match = members.find((member) => (member.email ?? "").toLowerCase() === value.toLowerCase());
+        if (match && memberIdSet.has(match.id)) {
+          result.add(discordId);
+        }
+      }
+    }
+
+    return [...result];
   }
 
   private async dispatch(payload: PlaneWebhookPayload): Promise<void> {
@@ -109,7 +170,28 @@ export class WebhookController {
       return;
     }
 
+    const assignedMemberIds = this.assignedMemberIds(payload);
+    const discordUserIds =
+      (this.context.mentionAssignee || this.context.dmAssignee) && assignedMemberIds.length
+        ? await this.resolveDiscordUserIds(extractProjectId(payload), assignedMemberIds)
+        : [];
+
+    if (discordUserIds.length && this.context.mentionAssignee) {
+      message.content = discordUserIds.map((id) => `<@${id}>`).join(" ");
+    }
+
     const sent = await sendChannelMessage(this.bot.client, channelId, message);
+
+    if (discordUserIds.length && this.context.dmAssignee) {
+      await Promise.all(
+        discordUserIds.map((userId) =>
+          sendDirectMessage(this.bot.client, userId, {
+            content: "A Plane work item was assigned to you",
+            embeds: message.embeds,
+          })
+        )
+      );
+    }
 
     if (this.context.autoThreads && payload.event === "issue" && payload.action === "create" && sent) {
       await this.createIssueThread(payload, sent, channelId);

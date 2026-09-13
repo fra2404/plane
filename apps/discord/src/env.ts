@@ -61,6 +61,8 @@ const envSchema = z.object({
   DISCORD_USER_MAPPING: jsonRecord,
   DISCORD_AUTO_THREADS: booleanish,
   DISCORD_MIRROR_MESSAGES: booleanish,
+  DISCORD_MENTION_ASSIGNEE: booleanish,
+  DISCORD_DM_ASSIGNEE: booleanish,
   DISCORD_THREAD_AUTO_ARCHIVE_MINUTES: z
     .string()
     .default("1440")
