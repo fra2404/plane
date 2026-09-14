@@ -115,3 +115,28 @@ export interface PlaneWebhookPayload<T = Record<string, unknown>> {
   data: T | null;
   activity: PlaneWebhookActivity | null;
 }
+
+export type AlertmanagerStatus = "firing" | "resolved";
+
+export interface AlertmanagerAlert {
+  status: AlertmanagerStatus;
+  labels: Record<string, string>;
+  annotations: Record<string, string>;
+  startsAt?: string;
+  endsAt?: string;
+  generatorURL?: string;
+  fingerprint?: string;
+}
+
+export interface AlertmanagerPayload {
+  version?: string;
+  groupKey?: string;
+  truncatedAlerts?: number;
+  status: AlertmanagerStatus;
+  receiver?: string;
+  groupLabels?: Record<string, string>;
+  commonLabels?: Record<string, string>;
+  commonAnnotations?: Record<string, string>;
+  externalURL?: string;
+  alerts: AlertmanagerAlert[];
+}

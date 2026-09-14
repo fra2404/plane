@@ -4,5 +4,6 @@
  * See the LICENSE file for details.
  */
 
+export { AlertController } from "./alert.controller";
 export { HealthController } from "./health.controller";
 export { WebhookController } from "./webhook.controller";

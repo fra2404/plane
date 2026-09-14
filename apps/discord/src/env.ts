@@ -61,6 +61,8 @@ const envSchema = z.object({
   DISCORD_USER_MAPPING: jsonRecord,
   DISCORD_AUTO_THREADS: booleanish,
   DISCORD_MIRROR_MESSAGES: booleanish,
+  // Channel that receives Alertmanager alerts (falls back to the default channel).
+  DISCORD_ALERTS_CHANNEL_ID: z.string().optional(),
   // Where assignment notifications go: "dm" (private, default), "channel" or "both".
   DISCORD_ASSIGN_DELIVERY: z
     .string()
@@ -87,6 +89,10 @@ const envSchema = z.object({
 
   // Optional Redis for persistent issue <-> thread links
   REDIS_URL: optionalUrl,
+
+  // Alertmanager -> Discord bridge. When set, the /webhooks/alertmanager
+  // endpoint requires this token (Authorization: Bearer or X-Alertmanager-Token).
+  ALERTMANAGER_TOKEN: z.string().optional(),
 });
 
 const validateEnv = () => {

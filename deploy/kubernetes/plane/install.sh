@@ -64,6 +64,7 @@ if [[ -n "${DISCORD_BOT_TOKEN:-}" && -n "${PLANE_API_TOKEN:-}" ]]; then
     --from-literal=PLANE_API_TOKEN="$PLANE_API_TOKEN" \
     --from-literal=PLANE_WEBHOOK_SECRETS="${PLANE_WEBHOOK_SECRETS:-{\}}" \
     --from-literal=PLANE_WEBHOOK_SECRET="${PLANE_WEBHOOK_SECRET:-}" \
+    --from-literal=ALERTMANAGER_TOKEN="${ALERTMANAGER_TOKEN:-}" \
     --dry-run=client -o yaml | kubectl apply -f -
 else
   echo "    DISCORD_BOT_TOKEN/PLANE_API_TOKEN not set, skipping. Create discord-secrets manually."

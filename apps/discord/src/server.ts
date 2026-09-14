@@ -12,7 +12,7 @@ import express from "express";
 import helmet from "helmet";
 import { registerController } from "@plane/decorators";
 import { logger, loggerMiddleware } from "@plane/logger";
-import { HealthController, WebhookController } from "@/controllers";
+import { AlertController, HealthController, WebhookController } from "@/controllers";
 import type { AppContext } from "@/context";
 import { DiscordBot } from "@/discord/client";
 import { env } from "@/env";
@@ -108,6 +108,7 @@ export class Server {
 
     registerController(this.router, HealthController, []);
     registerController(this.router, WebhookController, [this.bot, this.mapper, this.context]);
+    registerController(this.router, AlertController, [this.bot]);
   }
 
   private setupNotFoundHandler(): void {
