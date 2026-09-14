@@ -56,15 +56,16 @@ export class DiscordBot {
   private async registerCommands(client: Client): Promise<void> {
     const body = COMMANDS.map((command) => command.toJSON());
 
+    // Global registration is required for the commands to be usable in DMs.
+    await client.application!.commands.set(body);
+    logger.info(`DISCORD: Registered ${body.length} global commands`);
+
+    // Guild registration gives instant updates inside the server.
     if (env.DISCORD_GUILD_ID) {
       const guild = await client.guilds.fetch(env.DISCORD_GUILD_ID);
       await guild.commands.set(body);
       logger.info(`DISCORD: Registered ${body.length} commands in guild ${env.DISCORD_GUILD_ID}`);
-      return;
     }
-
-    await client.application!.commands.set(body);
-    logger.info(`DISCORD: Registered ${body.length} global commands`);
   }
 
   async destroy(): Promise<void> {
