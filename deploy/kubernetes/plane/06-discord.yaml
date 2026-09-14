@@ -18,8 +18,8 @@ data:
   DISCORD_AUTO_THREADS: "true"
   DISCORD_MIRROR_MESSAGES: "false"
   DISCORD_ASSIGN_DELIVERY: "dm"
-  # Channel that receives Alertmanager alerts (NodeDown). Set to the dedicated channel id.
-  DISCORD_ALERTS_CHANNEL_ID: ""
+  # Channel that receives Alertmanager alerts (NodeDown): #segnalazioni
+  DISCORD_ALERTS_CHANNEL_ID: "1236303486023372980"
   DISCORD_THREAD_AUTO_ARCHIVE_MINUTES: "1440"
   PLANE_API_BASE_URL: https://plane.algios.dev
   PLANE_WORKSPACE_SLUG: algios
