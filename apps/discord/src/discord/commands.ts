@@ -109,7 +109,56 @@ const statusCommand = new SlashCommandBuilder()
     option.setName("project").setDescription("Plane project").setRequired(true).setAutocomplete(true)
   );
 
-export const COMMANDS = [issueCommand, statusCommand];
+const myCommand = new SlashCommandBuilder()
+  .setName("my")
+  .setDescription("Show the work items assigned to you (all projects)")
+  .addIntegerOption((option) =>
+    option.setName("limit").setDescription("How many to show (1-25)").setMinValue(1).setMaxValue(25)
+  );
+
+const intranetCommand = new SlashCommandBuilder()
+  .setName("intranet")
+  .setDescription("Algios intranet: IP/devices, useful links and news")
+  .addSubcommand((sub) =>
+    sub
+      .setName("ip")
+      .setDescription("Search the IP / device list")
+      .addStringOption((option) =>
+        option.setName("query").setDescription("Filter by name, IP or owner").setAutocomplete(false)
+      )
+  )
+  .addSubcommand((sub) => sub.setName("links").setDescription("Show the useful links"))
+  .addSubcommand((sub) =>
+    sub
+      .setName("news")
+      .setDescription("Show the latest news")
+      .addIntegerOption((option) =>
+        option.setName("limit").setDescription("How many (1-10)").setMinValue(1).setMaxValue(10)
+      )
+  );
+
+const worklogCommand = new SlashCommandBuilder()
+  .setName("worklog")
+  .setDescription("Log time on a work item or report logged time")
+  .addSubcommand((sub) =>
+    sub
+      .setName("log")
+      .setDescription("Log time on a work item")
+      .addStringOption((option) =>
+        option.setName("id").setDescription("Work item identifier (e.g. ALGIOS-12)").setRequired(true)
+      )
+      .addStringOption((option) => option.setName("duration").setDescription("e.g. 1h 30m, 90m, 2h").setRequired(true))
+      .addStringOption((option) => option.setName("description").setDescription("What did you work on?"))
+  )
+  .addSubcommand((sub) =>
+    sub
+      .setName("report")
+      .setDescription("Report logged time (admins)")
+      .addStringOption((option) => option.setName("month").setDescription("Month as YYYY-MM (default: current)"))
+      .addStringOption((option) => option.setName("user").setDescription("Filter by user name or email"))
+  );
+
+export const COMMANDS = [issueCommand, statusCommand, myCommand, intranetCommand, worklogCommand];
 
 export function escapeHtml(value: string): string {
   return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -148,7 +197,7 @@ function assigneeNames(workItem: PlaneWorkItem): string | undefined {
  */
 async function resolveDiscordMemberId(
   interaction: ChatInputCommandInteraction,
-  projectId: string,
+  projectId: string | undefined,
   deps: CommandDeps
 ): Promise<string | undefined> {
   const mapping = deps.userMapping ?? {};
@@ -164,7 +213,9 @@ async function resolveDiscordMemberId(
 
   if (mapped.includes("@")) {
     try {
-      const members = await deps.plane.listProjectMembers(projectId);
+      const members = projectId
+        ? await deps.plane.listProjectMembers(projectId)
+        : await deps.plane.listWorkspaceMembers();
       const match = members.find((member) => (member.email ?? "").toLowerCase() === mapped.toLowerCase());
       return match?.id;
     } catch (error) {
@@ -174,6 +225,47 @@ async function resolveDiscordMemberId(
   }
 
   return mapped;
+}
+
+function parseDurationInput(raw: string): number | null {
+  const value = raw.trim().toLowerCase();
+  if (!value) return null;
+  const match = value.match(/^(?:(\d+)\s*h)?\s*(?:(\d+)\s*m)?\s*(?:(\d+)\s*s)?$/);
+  if (match && (match[1] || match[2] || match[3])) {
+    const total = Number(match[1] ?? 0) * 3600 + Number(match[2] ?? 0) * 60 + Number(match[3] ?? 0);
+    return total > 0 ? total : null;
+  }
+  // A bare number is treated as minutes.
+  if (/^\d+$/.test(value)) {
+    const minutes = Number(value);
+    return minutes > 0 ? minutes * 60 : null;
+  }
+  return null;
+}
+
+function formatSeconds(totalSeconds: number): string {
+  const rounded = Math.max(0, Math.round(totalSeconds));
+  const hours = Math.floor(rounded / 3600);
+  const minutes = Math.floor((rounded % 3600) / 60);
+  const parts: string[] = [];
+  if (hours > 0) parts.push(`${hours}h`);
+  if (minutes > 0) parts.push(`${minutes}m`);
+  return parts.join(" ") || "0m";
+}
+
+function monthRange(month?: string | null): { dateFrom: string; dateTo: string; label: string } {
+  let year: number;
+  let monthNumber: number;
+  if (month && /^\d{4}-\d{2}$/.test(month.trim())) {
+    [year, monthNumber] = month.trim().split("-").map(Number);
+  } else {
+    const now = new Date();
+    year = now.getFullYear();
+    monthNumber = now.getMonth() + 1;
+  }
+  const label = `${year}-${String(monthNumber).padStart(2, "0")}`;
+  const lastDay = new Date(year, monthNumber, 0).getDate();
+  return { dateFrom: `${label}-01`, dateTo: `${label}-${String(lastDay).padStart(2, "0")}`, label };
 }
 
 function workItemToEmbed(workItem: PlaneWorkItem, webBaseUrl: string, workspaceSlug: string): APIEmbed {
@@ -483,6 +575,134 @@ async function handleStatus(interaction: ChatInputCommandInteraction, deps: Comm
   });
 }
 
+async function handleMy(interaction: ChatInputCommandInteraction, deps: CommandDeps): Promise<void> {
+  const limit = interaction.options.getInteger("limit") ?? 10;
+  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+
+  const memberId = await resolveDiscordMemberId(interaction, undefined, deps);
+  if (!memberId) {
+    await interaction.editReply({ content: "Nessun mapping Discord→Plane per te. Chiedi a un admin di aggiungerlo." });
+    return;
+  }
+
+  const items = await deps.plane.listMyWorkItems({ assigneeId: memberId, perPage: Math.max(limit, 25) });
+  const lines = items.slice(0, limit).map((item) => `• #${item.sequence_id} ${item.name} — ${stateName(item)}`);
+  await interaction.editReply({
+    content: `**I tuoi task (${items.length})**\n${lines.join("\n") || "Nessun task assegnato."}`,
+  });
+}
+
+async function handleIntranet(interaction: ChatInputCommandInteraction, deps: CommandDeps): Promise<void> {
+  const sub = interaction.options.getSubcommand();
+  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+
+  if (sub === "ip") {
+    const query = (interaction.options.getString("query") ?? "").toLowerCase();
+    const devices = await deps.plane.listDevices();
+    const filtered = devices.filter((device) =>
+      [device.name, device.local_ip, device.vpn_ip, device.owner, device.description]
+        .filter(Boolean)
+        .some((value) => value.toLowerCase().includes(query))
+    );
+    const lines = filtered
+      .slice(0, 25)
+      .map(
+        (device) =>
+          `• **${device.name}** (${device.type}) — IP ${device.local_ip || "—"}${
+            device.vpn_ip ? ` / VPN ${device.vpn_ip}` : ""
+          }${device.owner ? ` — ${device.owner}` : ""}`
+      );
+    await interaction.editReply({
+      content: `**IP & Dispositivi (${filtered.length})**\n${lines.join("\n") || "Nessun risultato."}`,
+    });
+    return;
+  }
+
+  if (sub === "links") {
+    const links = await deps.plane.listLinks();
+    const lines = links.map(
+      (link) =>
+        `• [${link.label}](${link.url})${link.category ? ` _(${link.category})_` : ""}${
+          link.description ? ` — ${link.description}` : ""
+        }`
+    );
+    await interaction.editReply({
+      content: `**Link utili (${links.length})**\n${lines.join("\n") || "Nessun link configurato."}`,
+    });
+    return;
+  }
+
+  const limit = interaction.options.getInteger("limit") ?? 5;
+  const news = await deps.plane.listNews();
+  const lines = news.slice(0, limit).map((item) => {
+    const date = item.created_at ? new Date(item.created_at).toLocaleDateString("it-IT") : "";
+    const tags = item.tags?.length ? ` [${item.tags.join(", ")}]` : "";
+    return `• **${item.title}** ${date ? `(${date})` : ""}${tags}\n  ${(item.description ?? "").slice(0, 200)}`;
+  });
+  await interaction.editReply({
+    content: `**News (${news.length})**\n${lines.join("\n\n") || "Nessuna news."}`,
+  });
+}
+
+async function handleWorklog(interaction: ChatInputCommandInteraction, deps: CommandDeps): Promise<void> {
+  const sub = interaction.options.getSubcommand();
+
+  if (sub === "log") {
+    const key = interaction.options.getString("id", true);
+    const durationRaw = interaction.options.getString("duration", true);
+    const description = interaction.options.getString("description") ?? undefined;
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+
+    const seconds = parseDurationInput(durationRaw);
+    if (seconds == null) {
+      await interaction.editReply({ content: "Durata non valida. Esempi: `1h 30m`, `90m`, `2h`." });
+      return;
+    }
+    const workItem = await deps.plane.getWorkItemByKey(key);
+    const projectId = workItem.project ?? workItem.project_detail?.id;
+    if (!projectId) {
+      await interaction.editReply({ content: `Progetto non risolvibile per ${key}.` });
+      return;
+    }
+    await deps.plane.createWorklog(projectId, workItem.id, seconds, description);
+    await interaction.editReply({
+      content: `Registrato **${formatSeconds(seconds)}** su #${workItem.sequence_id}${
+        description ? ` — ${description}` : ""
+      }.`,
+    });
+    return;
+  }
+
+  const month = interaction.options.getString("month");
+  const userFilter = interaction.options.getString("user")?.toLowerCase();
+  const range = monthRange(month);
+  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+
+  const summary = await deps.plane.getWorklogSummary({ dateFrom: range.dateFrom, dateTo: range.dateTo });
+  let totals = summary.user_totals;
+  if (userFilter) {
+    totals = totals.filter((item) => {
+      const detail = item.actor_detail;
+      return (
+        (detail?.display_name ?? "").toLowerCase().includes(userFilter) ||
+        (detail?.email ?? "").toLowerCase().includes(userFilter)
+      );
+    });
+  }
+  const lines = totals.map(
+    (item) =>
+      `• ${item.actor_detail?.display_name ?? item.actor_detail?.email ?? "?"} — ${formatSeconds(item.duration)} (${
+        item.worklog_count
+      })`
+  );
+  const total = totals.reduce((sum, item) => sum + item.duration, 0);
+  await interaction.editReply({
+    content: `**Ore registrate · ${range.label}**\n${lines.join("\n") || "Nessuna registrazione."}\nTotale: **${formatSeconds(
+      total
+    )}**`,
+  });
+}
+
 export async function handleInteraction(interaction: Interaction, deps: CommandDeps): Promise<void> {
   if (interaction.isAutocomplete()) {
     await handleAutocomplete(interaction, deps);
@@ -500,6 +720,15 @@ export async function handleInteraction(interaction: Interaction, deps: CommandD
         return;
       case "status":
         await handleStatus(interaction, deps);
+        return;
+      case "my":
+        await handleMy(interaction, deps);
+        return;
+      case "intranet":
+        await handleIntranet(interaction, deps);
+        return;
+      case "worklog":
+        await handleWorklog(interaction, deps);
         return;
       default:
         return;

@@ -47,6 +47,45 @@ export interface PlaneComment {
   comment_stripped?: string;
 }
 
+export interface IntranetDevice {
+  id: string;
+  name: string;
+  type: string;
+  local_ip: string;
+  vpn_ip: string;
+  description: string;
+  owner: string;
+}
+
+export interface IntranetLink {
+  id: string;
+  label: string;
+  url: string;
+  category: string;
+  description: string;
+  sort_order: number;
+}
+
+export interface IntranetNews {
+  id: string;
+  title: string;
+  description: string;
+  tags: string[];
+  author_detail?: PlaneUser | null;
+  created_at: string;
+}
+
+export interface WorklogSummary {
+  total_logged_time: number;
+  user_totals: {
+    actor_id: string | null;
+    actor_detail: PlaneUser | null;
+    duration: number;
+    worklog_count: number;
+  }[];
+  monthly_totals: { month: string; duration: number; worklog_count: number }[];
+}
+
 export interface Paginated<T> {
   results: T[];
   next?: string | null;

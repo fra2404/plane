@@ -72,3 +72,17 @@ from .user import UserEndpoint
 from .invite import WorkspaceInvitationsViewset
 
 from .sticky import StickyViewSet
+
+from .worklog import (
+    WorklogDetailAPIEndpoint,
+    WorklogListCreateAPIEndpoint,
+    WorkspaceWorklogSummaryAPIEndpoint,
+)
+
+from .my_work_items import WorkspaceMyWorkItemsAPIEndpoint
+
+from .intranet import (
+    IntranetDeviceListAPIEndpoint,
+    IntranetLinkListAPIEndpoint,
+    IntranetNewsListAPIEndpoint,
+)

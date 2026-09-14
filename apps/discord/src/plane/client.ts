@@ -5,7 +5,17 @@
  */
 
 import { AppError } from "@/lib/errors";
-import type { Paginated, PlaneProject, PlaneState, PlaneUser, PlaneWorkItem } from "@/types";
+import type {
+  IntranetDevice,
+  IntranetLink,
+  IntranetNews,
+  Paginated,
+  PlaneProject,
+  PlaneState,
+  PlaneUser,
+  PlaneWorkItem,
+  WorklogSummary,
+} from "@/types";
 
 type RawProjectMember = PlaneUser | { id?: string; member?: PlaneUser };
 
@@ -139,6 +149,21 @@ export class PlaneClient {
     return value;
   }
 
+  async listWorkspaceMembers(): Promise<PlaneUser[]> {
+    const cacheKey = "__workspace__";
+    const cached = this.membersCache.get(cacheKey);
+    if (cached && Date.now() - cached.at < this.projectsTtlMs) {
+      return cached.value;
+    }
+    const data = await this.request<Paginated<RawProjectMember> | RawProjectMember[]>(
+      `/workspaces/${this.workspaceSlug}/members/`,
+      { query: { per_page: 100 } }
+    );
+    const value = this.unwrapResults(data).map(normalizeMember);
+    this.membersCache.set(cacheKey, { at: Date.now(), value });
+    return value;
+  }
+
   async listWorkItems(
     projectId: string,
     options: { perPage?: number; orderBy?: string } = {}
@@ -196,6 +221,72 @@ export class PlaneClient {
     return this.request(`/workspaces/${this.workspaceSlug}/projects/${projectId}/work-items/${workItemId}/comments/`, {
       method: "POST",
       body: { comment_html: commentHtml, ...external },
+    });
+  }
+
+  /** Work items assigned to a user (defaults to the API token owner). */
+  async listMyWorkItems(options: { assigneeId?: string; perPage?: number } = {}): Promise<PlaneWorkItem[]> {
+    const data = await this.request<Paginated<PlaneWorkItem> | PlaneWorkItem[]>(
+      `/workspaces/${this.workspaceSlug}/work-items/my/`,
+      {
+        query: {
+          per_page: options.perPage ?? 20,
+          assignee_id: options.assigneeId,
+          expand: "state,assignees",
+        },
+      }
+    );
+    return this.unwrapResults(data);
+  }
+
+  // Intranet
+  async listDevices(): Promise<IntranetDevice[]> {
+    const data = await this.request<IntranetDevice[] | Paginated<IntranetDevice>>(
+      `/workspaces/${this.workspaceSlug}/intranet/devices/`
+    );
+    return this.unwrapResults(data);
+  }
+
+  async listLinks(): Promise<IntranetLink[]> {
+    const data = await this.request<IntranetLink[] | Paginated<IntranetLink>>(
+      `/workspaces/${this.workspaceSlug}/intranet/links/`
+    );
+    return this.unwrapResults(data);
+  }
+
+  async listNews(): Promise<IntranetNews[]> {
+    const data = await this.request<IntranetNews[] | Paginated<IntranetNews>>(
+      `/workspaces/${this.workspaceSlug}/intranet/news/`
+    );
+    return this.unwrapResults(data);
+  }
+
+  // Worklogs (time tracking)
+  async createWorklog(
+    projectId: string,
+    workItemId: string,
+    durationSeconds: number,
+    description?: string
+  ): Promise<unknown> {
+    return this.request(`/workspaces/${this.workspaceSlug}/projects/${projectId}/work-items/${workItemId}/worklogs/`, {
+      method: "POST",
+      body: { duration: durationSeconds, description: description ?? "" },
+    });
+  }
+
+  async getWorklogSummary(params: {
+    actorId?: string;
+    projectId?: string;
+    dateFrom?: string;
+    dateTo?: string;
+  }): Promise<WorklogSummary> {
+    return this.request<WorklogSummary>(`/workspaces/${this.workspaceSlug}/worklog-summary/`, {
+      query: {
+        actor_id: params.actorId,
+        project_id: params.projectId,
+        date_from: params.dateFrom,
+        date_to: params.dateTo,
+      },
     });
   }
 }
