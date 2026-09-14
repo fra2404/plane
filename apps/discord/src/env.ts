@@ -33,6 +33,11 @@ const booleanish = z
   .default("false")
   .transform((value) => ["1", "true", "yes", "on"].includes(value.trim().toLowerCase()));
 
+const booleanishTrue = z
+  .string()
+  .default("true")
+  .transform((value) => ["1", "true", "yes", "on"].includes(value.trim().toLowerCase()));
+
 // Treat an empty string as "not provided" for optional URL variables, so the
 // default `.env.example` values work as-is.
 const optionalUrl = z.preprocess(
@@ -59,6 +64,8 @@ const envSchema = z.object({
   DISCORD_DEFAULT_CHANNEL_ID: z.string().optional(),
   DISCORD_CHANNEL_MAPPING: jsonRecord,
   DISCORD_USER_MAPPING: jsonRecord,
+  // Auto-resolve a channel by project name/identifier when no explicit mapping exists.
+  DISCORD_AUTO_CHANNEL_MATCH: booleanishTrue,
   DISCORD_AUTO_THREADS: booleanish,
   DISCORD_MIRROR_MESSAGES: booleanish,
   // Channel that receives Alertmanager alerts (falls back to the default channel).

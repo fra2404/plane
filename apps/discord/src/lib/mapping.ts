@@ -5,6 +5,7 @@
  */
 
 import { logger } from "@plane/logger";
+import type { ChannelNameIndex } from "@/discord/channel-index";
 import type { PlaneClient } from "@/plane/client";
 import type { PlaneWebhookPayload } from "@/types";
 
@@ -34,9 +35,11 @@ export function extractProjectId(payload: PlaneWebhookPayload): string | undefin
 /**
  * Resolves the Discord channel a webhook should be posted to.
  *
- * Configured via `DISCORD_CHANNEL_MAPPING`, whose keys can be either a Plane
- * project UUID or a project identifier (e.g. `PROJ`). When no explicit mapping
- * exists, it falls back to the optional default channel.
+ * Resolution order:
+ * 1. explicit `DISCORD_CHANNEL_MAPPING` entry (by project UUID or identifier),
+ * 2. a Discord channel whose name matches the project identifier/name
+ *    (so new projects work automatically once a same-named channel exists),
+ * 3. the configured default channel.
  */
 export class ChannelMapper {
   private readonly byKey: Map<string, string>;
@@ -44,7 +47,8 @@ export class ChannelMapper {
   constructor(
     mapping: Record<string, string>,
     private readonly defaultChannelId: string | undefined,
-    private readonly client: PlaneClient
+    private readonly client: PlaneClient,
+    private readonly channelIndex?: ChannelNameIndex
   ) {
     this.byKey = new Map(Object.entries(mapping).map(([key, value]) => [key.toLowerCase(), value]));
   }
@@ -59,20 +63,32 @@ export class ChannelMapper {
       return direct;
     }
 
-    try {
-      const projects = await this.client.listProjects();
-      const project = projects.find((candidate) => candidate.id === projectId);
-      if (project) {
-        const byIdentifier = this.byKey.get(project.identifier.toLowerCase());
-        if (byIdentifier) {
-          return byIdentifier;
+    const project = await this.findProject(projectId);
+    if (project) {
+      const byIdentifier = this.byKey.get(project.identifier.toLowerCase());
+      if (byIdentifier) {
+        return byIdentifier;
+      }
+
+      if (this.channelIndex) {
+        const byName = await this.channelIndex.resolveByName([project.identifier, project.name]);
+        if (byName) {
+          return byName;
         }
       }
-    } catch (error) {
-      logger.warn("DISCORD_MAPPER: Unable to resolve project identifier from Plane API", error);
     }
 
     return this.defaultChannelId;
+  }
+
+  private async findProject(projectId: string) {
+    try {
+      const projects = await this.client.listProjects();
+      return projects.find((candidate) => candidate.id === projectId);
+    } catch (error) {
+      logger.warn("DISCORD_MAPPER: Unable to resolve project from Plane API", error);
+      return undefined;
+    }
   }
 
   async resolve(payload: PlaneWebhookPayload): Promise<string | undefined> {

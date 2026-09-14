@@ -14,6 +14,7 @@ import { registerController } from "@plane/decorators";
 import { logger, loggerMiddleware } from "@plane/logger";
 import { AlertController, HealthController, WebhookController } from "@/controllers";
 import type { AppContext } from "@/context";
+import { DiscordChannelIndex } from "@/discord/channel-index";
 import { DiscordBot } from "@/discord/client";
 import { env } from "@/env";
 import { createLinkStore, type LinkStore } from "@/lib/link-store";
@@ -24,11 +25,11 @@ export class Server {
   private readonly app: Express;
   private readonly router: Router;
   private readonly plane: PlaneClient;
-  private readonly mapper: ChannelMapper;
 
   private bot: DiscordBot | undefined;
   private linkStore: LinkStore | undefined;
   private context: AppContext | undefined;
+  private mapper: ChannelMapper | undefined;
   private httpServer: HttpServer | undefined;
 
   constructor() {
@@ -40,7 +41,6 @@ export class Server {
     this.app.use(env.API_BASE_PATH, this.router);
 
     this.plane = new PlaneClient(env.PLANE_API_BASE_URL, env.PLANE_API_TOKEN, env.PLANE_WORKSPACE_SLUG);
-    this.mapper = new ChannelMapper(env.DISCORD_CHANNEL_MAPPING, env.DISCORD_DEFAULT_CHANNEL_ID, this.plane);
   }
 
   public async initialize(): Promise<void> {
@@ -61,6 +61,14 @@ export class Server {
       this.bot = new DiscordBot(this.context);
       await this.bot.initialize();
       logger.info("SERVER: Discord bot is ready");
+
+      const channelIndex = new DiscordChannelIndex(this.bot.client, env.DISCORD_AUTO_CHANNEL_MATCH);
+      this.mapper = new ChannelMapper(
+        env.DISCORD_CHANNEL_MAPPING,
+        env.DISCORD_DEFAULT_CHANNEL_ID,
+        this.plane,
+        channelIndex
+      );
 
       this.setupRoutes();
       this.setupNotFoundHandler();
@@ -102,7 +110,7 @@ export class Server {
   }
 
   private setupRoutes(): void {
-    if (!this.bot || !this.context) {
+    if (!this.bot || !this.context || !this.mapper) {
       throw new Error("Server must be initialized before registering routes");
     }
 

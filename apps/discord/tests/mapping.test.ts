@@ -63,4 +63,24 @@ describe("ChannelMapper", () => {
     const mapper = new ChannelMapper({}, undefined, createClient());
     await expect(mapper.resolve(buildPayload({ project: "unknown" }))).resolves.toBeUndefined();
   });
+
+  it("resolves by channel name when no explicit mapping exists", async () => {
+    const index = { resolveByName: vi.fn().mockResolvedValue("channel-by-name") };
+    const mapper = new ChannelMapper({}, "default-channel", createClient(), index);
+    await expect(mapper.resolve(buildPayload({ project: "project-uuid" }))).resolves.toBe("channel-by-name");
+    expect(index.resolveByName).toHaveBeenCalledWith(["PROJ", "Project"]);
+  });
+
+  it("prefers an explicit mapping over the channel name", async () => {
+    const index = { resolveByName: vi.fn().mockResolvedValue("channel-by-name") };
+    const mapper = new ChannelMapper({ PROJ: "channel-2" }, "default-channel", createClient(), index);
+    await expect(mapper.resolve(buildPayload({ project: "project-uuid" }))).resolves.toBe("channel-2");
+    expect(index.resolveByName).not.toHaveBeenCalled();
+  });
+
+  it("falls back to the default channel when the name does not match", async () => {
+    const index = { resolveByName: vi.fn().mockResolvedValue(undefined) };
+    const mapper = new ChannelMapper({}, "default-channel", createClient(), index);
+    await expect(mapper.resolve(buildPayload({ project: "project-uuid" }))).resolves.toBe("default-channel");
+  });
 });
