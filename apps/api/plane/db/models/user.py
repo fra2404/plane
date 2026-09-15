@@ -239,6 +239,7 @@ class Profile(TimeAuditModel):
     billing_address = models.JSONField(null=True)
     has_billing_address = models.BooleanField(default=False)
     company_name = models.CharField(max_length=255, blank=True)
+    birthday = models.DateField(null=True, blank=True)
     notification_view_mode = models.CharField(
         max_length=255, choices=NotificationViewMode.choices, default=NotificationViewMode.FULL
     )

@@ -6,8 +6,21 @@ from rest_framework import status
 from rest_framework.response import Response
 
 from plane.app.permissions import ROLE, allow_permission
-from plane.app.serializers import IntranetDeviceSerializer, IntranetLinkSerializer, IntranetNewsSerializer
-from plane.db.models import IntranetDevice, IntranetLink, IntranetNews, Workspace
+from plane.app.serializers import (
+    IntranetClientSerializer,
+    IntranetContactSerializer,
+    IntranetDeviceSerializer,
+    IntranetLinkSerializer,
+    IntranetNewsSerializer,
+)
+from plane.db.models import (
+    IntranetClient,
+    IntranetContact,
+    IntranetDevice,
+    IntranetLink,
+    IntranetNews,
+    Workspace,
+)
 
 from .base import BaseViewSet
 
@@ -139,6 +152,100 @@ class IntranetNewsViewSet(BaseViewSet):
         if not obj:
             return Response({"error": "Not found."}, status=status.HTTP_404_NOT_FOUND)
         serializer = IntranetNewsSerializer(obj, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save(updated_by=request.user)
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    @allow_permission([ROLE.ADMIN], level="WORKSPACE")
+    def destroy(self, request, slug, pk):
+        obj = self.get_queryset().filter(pk=pk).first()
+        if not obj:
+            return Response({"error": "Not found."}, status=status.HTTP_404_NOT_FOUND)
+        obj.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class IntranetClientViewSet(BaseViewSet):
+    model = IntranetClient
+    serializer_class = IntranetClientSerializer
+
+    def get_queryset(self):
+        return IntranetClient.objects.filter(workspace__slug=self.kwargs.get("slug")).prefetch_related("contacts")
+
+    @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST], level="WORKSPACE")
+    def list(self, request, slug):
+        return Response(IntranetClientSerializer(self.get_queryset(), many=True).data)
+
+    @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST], level="WORKSPACE")
+    def retrieve(self, request, slug, pk):
+        obj = self.get_queryset().filter(pk=pk).first()
+        if not obj:
+            return Response({"error": "Not found."}, status=status.HTTP_404_NOT_FOUND)
+        return Response(IntranetClientSerializer(obj).data)
+
+    @allow_permission([ROLE.ADMIN], level="WORKSPACE")
+    def create(self, request, slug):
+        workspace = Workspace.objects.get(slug=slug)
+        serializer = IntranetClientSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save(workspace=workspace, created_by=request.user)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    @allow_permission([ROLE.ADMIN], level="WORKSPACE")
+    def partial_update(self, request, slug, pk):
+        obj = self.get_queryset().filter(pk=pk).first()
+        if not obj:
+            return Response({"error": "Not found."}, status=status.HTTP_404_NOT_FOUND)
+        serializer = IntranetClientSerializer(obj, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save(updated_by=request.user)
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    @allow_permission([ROLE.ADMIN], level="WORKSPACE")
+    def destroy(self, request, slug, pk):
+        obj = self.get_queryset().filter(pk=pk).first()
+        if not obj:
+            return Response({"error": "Not found."}, status=status.HTTP_404_NOT_FOUND)
+        obj.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class IntranetContactViewSet(BaseViewSet):
+    model = IntranetContact
+    serializer_class = IntranetContactSerializer
+
+    def get_queryset(self):
+        return IntranetContact.objects.filter(workspace__slug=self.kwargs.get("slug"))
+
+    @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST], level="WORKSPACE")
+    def list(self, request, slug):
+        return Response(IntranetContactSerializer(self.get_queryset(), many=True).data)
+
+    @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST], level="WORKSPACE")
+    def retrieve(self, request, slug, pk):
+        obj = self.get_queryset().filter(pk=pk).first()
+        if not obj:
+            return Response({"error": "Not found."}, status=status.HTTP_404_NOT_FOUND)
+        return Response(IntranetContactSerializer(obj).data)
+
+    @allow_permission([ROLE.ADMIN], level="WORKSPACE")
+    def create(self, request, slug):
+        workspace = Workspace.objects.get(slug=slug)
+        serializer = IntranetContactSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save(workspace=workspace, created_by=request.user)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    @allow_permission([ROLE.ADMIN], level="WORKSPACE")
+    def partial_update(self, request, slug, pk):
+        obj = self.get_queryset().filter(pk=pk).first()
+        if not obj:
+            return Response({"error": "Not found."}, status=status.HTTP_404_NOT_FOUND)
+        serializer = IntranetContactSerializer(obj, data=request.data, partial=True)
         if serializer.is_valid():
             serializer.save(updated_by=request.user)
             return Response(serializer.data)

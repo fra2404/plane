@@ -6,7 +6,7 @@ from rest_framework import serializers
 
 from plane.app.serializers.base import BaseSerializer
 from plane.app.serializers.user import UserLiteSerializer
-from plane.db.models import IntranetDevice, IntranetLink, IntranetNews
+from plane.db.models import IntranetClient, IntranetContact, IntranetDevice, IntranetLink, IntranetNews
 
 
 class IntranetDeviceSerializer(BaseSerializer):
@@ -99,4 +99,59 @@ class IntranetLinkSerializer(BaseSerializer):
         value = (value or "").strip()
         if not value:
             raise serializers.ValidationError("Label is required.")
+        return value
+
+
+class IntranetClientSerializer(BaseSerializer):
+    class Meta:
+        model = IntranetClient
+        fields = [
+            "id",
+            "workspace",
+            "name",
+            "vat",
+            "email",
+            "phone",
+            "website",
+            "address",
+            "notes",
+            "status",
+            "created_at",
+            "updated_at",
+            "created_by",
+            "updated_by",
+        ]
+        read_only_fields = ["id", "workspace", "created_at", "updated_at", "created_by", "updated_by"]
+
+    def validate_name(self, value):
+        value = (value or "").strip()
+        if not value:
+            raise serializers.ValidationError("Name is required.")
+        return value
+
+
+class IntranetContactSerializer(BaseSerializer):
+    class Meta:
+        model = IntranetContact
+        fields = [
+            "id",
+            "workspace",
+            "client",
+            "name",
+            "role",
+            "email",
+            "phone",
+            "mobile",
+            "notes",
+            "created_at",
+            "updated_at",
+            "created_by",
+            "updated_by",
+        ]
+        read_only_fields = ["id", "workspace", "created_at", "updated_at", "created_by", "updated_by"]
+
+    def validate_name(self, value):
+        value = (value or "").strip()
+        if not value:
+            raise serializers.ValidationError("Name is required.")
         return value

@@ -20,6 +20,7 @@ import { SettingsContentWrapper } from "@/components/settings/content-wrapper";
 import { IssueService } from "@/services/issue";
 // hooks
 import { useUserPermissions } from "@/hooks/store/user";
+import { useProject } from "@/hooks/store/use-project";
 import { useWorkspace } from "@/hooks/store/use-workspace";
 // local imports
 import { WorklogsWorkspaceSettingsHeader } from "./header";
@@ -43,14 +44,43 @@ const WorkspaceWorklogsSettingsPage = observer(function WorkspaceWorklogsSetting
   const { t } = useTranslation();
   const { currentWorkspace } = useWorkspace();
   const { workspaceUserInfo, allowPermissions } = useUserPermissions();
+  const { updateProject } = useProject();
 
   const [overview, setOverview] = useState<TWorkspaceWorklogSummary | null>(null);
   const [summary, setSummary] = useState<TWorkspaceWorklogSummary | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
   const [selectedMonth, setSelectedMonth] = useState<string>("all");
+  const [budgetDraft, setBudgetDraft] = useState<Record<string, string>>({});
+  const [savingBudget, setSavingBudget] = useState<string | null>(null);
 
   const canAdmin = allowPermissions([EUserPermissions.ADMIN], EUserPermissionsLevel.WORKSPACE);
+
+  const projectTotals = summary?.project_totals ?? overview?.project_totals ?? [];
+
+  const hours = (seconds: number) => (seconds / 3600).toFixed(1);
+
+  const saveBudget = async (projectId: string) => {
+    if (!workspaceSlug) return;
+    const raw = budgetDraft[projectId];
+    if (raw === undefined) return;
+    const trimmed = raw.trim();
+    const value = trimmed === "" ? null : Number(trimmed);
+    if (value !== null && Number.isNaN(value)) return;
+    setSavingBudget(projectId);
+    try {
+      await updateProject(workspaceSlug, projectId, { budget_hours: value });
+      setBudgetDraft((prev) => {
+        const next = { ...prev };
+        delete next[projectId];
+        return next;
+      });
+    } catch {
+      // ignore; input keeps the value
+    } finally {
+      setSavingBudget(null);
+    }
+  };
 
   // Full (unfiltered) overview: keeps the month list and per-month totals stable.
   useEffect(() => {
@@ -169,6 +199,75 @@ const WorkspaceWorklogsSettingsPage = observer(function WorkspaceWorklogsSetting
                           </td>
                         </tr>
                       ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            <div>
+              <h5 className="pb-2 text-body-sm-medium text-secondary">Per progetto (budget ore)</h5>
+              {projectTotals.length === 0 ? (
+                <p className="py-2 text-body-sm-regular text-tertiary">{t("activity_empty_state.no_worklogs")}</p>
+              ) : (
+                <div className="overflow-hidden rounded-md border border-subtle">
+                  <table className="w-full table-auto text-left text-body-sm-regular">
+                    <thead className="bg-surface-2 text-tertiary">
+                      <tr>
+                        <th className="px-3 py-2 font-medium">Progetto</th>
+                        <th className="px-3 py-2 text-right font-medium">Budget (h)</th>
+                        <th className="px-3 py-2 text-right font-medium">Registrate (h)</th>
+                        <th className="px-3 py-2 text-right font-medium">Residuo (h)</th>
+                        <th className="px-3 py-2" />
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {projectTotals.map((item) => {
+                        if (!item.project_id) return null;
+                        const projectId = item.project_id;
+                        const logged = item.duration / 3600;
+                        const budget = item.budget_hours;
+                        const remaining = budget != null ? budget - logged : null;
+                        const draft = budgetDraft[projectId];
+                        return (
+                          <tr key={projectId} className="border-t border-subtle">
+                            <td className="px-3 py-2 text-primary">{item.project_name}</td>
+                            <td className="px-3 py-2 text-right">
+                              <input
+                                type="number"
+                                step="0.5"
+                                min="0"
+                                placeholder="—"
+                                value={draft ?? (budget != null ? String(budget) : "")}
+                                onChange={(event) =>
+                                  setBudgetDraft((prev) => ({ ...prev, [projectId]: event.target.value }))
+                                }
+                                className="w-20 rounded border border-subtle bg-surface-1 px-2 py-1 text-right text-body-sm-regular text-primary outline-none"
+                              />
+                            </td>
+                            <td className="px-3 py-2 text-right text-secondary">{hours(item.duration)}</td>
+                            <td
+                              className={`px-3 py-2 text-right font-medium ${
+                                remaining != null && remaining < 0 ? "text-danger-primary" : "text-primary"
+                              }`}
+                            >
+                              {remaining != null ? remaining.toFixed(1) : "—"}
+                            </td>
+                            <td className="px-3 py-2 text-right">
+                              {draft !== undefined && (
+                                <button
+                                  type="button"
+                                  disabled={savingBudget === projectId}
+                                  onClick={() => void saveBudget(projectId)}
+                                  className="rounded bg-accent-primary px-2 py-1 text-11 text-white disabled:opacity-50"
+                                >
+                                  Salva
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>

@@ -15,6 +15,7 @@ import { useUserProfile, useUser } from "@/hooks/store/user";
 // plane web imports
 import { TourRoot } from "@/components/onboarding/tour/root";
 // local imports
+import { AnniversaryCard } from "./anniversary-card";
 import { DashboardWidgets } from "./home-dashboard-widgets";
 import { IntranetCard } from "./intranet-card";
 import { UserGreetingsView } from "./user-greetings";
@@ -59,6 +60,7 @@ export const WorkspaceHomeView = observer(function WorkspaceHomeView() {
           <div className="mx-auto w-full max-w-[800px]">
             {currentUser && <UserGreetingsView user={currentUser} />}
             <IntranetCard />
+            <AnniversaryCard />
             <DashboardWidgets />
           </div>
         </ContentWrapper>

@@ -79,3 +79,60 @@ class IntranetLink(WorkspaceBaseModel):
 
     def __str__(self):
         return f"{self.label} ({self.url})"
+
+
+class IntranetClient(WorkspaceBaseModel):
+    """Client registry (anagrafica clienti)."""
+
+    STATUS_CHOICES = (
+        ("active", "Attivo"),
+        ("prospect", "Prospect"),
+        ("inactive", "Inattivo"),
+    )
+
+    name = models.CharField(max_length=255)
+    vat = models.CharField(max_length=50, blank=True, default="")
+    email = models.EmailField(blank=True, default="")
+    phone = models.CharField(max_length=50, blank=True, default="")
+    website = models.CharField(max_length=255, blank=True, default="")
+    address = models.TextField(blank=True, default="")
+    notes = models.TextField(blank=True, default="")
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="active")
+
+    class Meta:
+        verbose_name = "Intranet Client"
+        verbose_name_plural = "Intranet Clients"
+        db_table = "intranet_clients"
+        ordering = ("name",)
+        indexes = [models.Index(fields=["workspace", "name"], name="intranet_client_ws_idx")]
+
+    def __str__(self):
+        return self.name
+
+
+class IntranetContact(WorkspaceBaseModel):
+    """Client contact (referente), optionally linked to a client."""
+
+    client = models.ForeignKey(
+        "db.IntranetClient",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="contacts",
+    )
+    name = models.CharField(max_length=255)
+    role = models.CharField(max_length=150, blank=True, default="")
+    email = models.EmailField(blank=True, default="")
+    phone = models.CharField(max_length=50, blank=True, default="")
+    mobile = models.CharField(max_length=50, blank=True, default="")
+    notes = models.TextField(blank=True, default="")
+
+    class Meta:
+        verbose_name = "Intranet Contact"
+        verbose_name_plural = "Intranet Contacts"
+        db_table = "intranet_contacts"
+        ordering = ("name",)
+        indexes = [models.Index(fields=["workspace", "name"], name="intranet_contact_ws_idx")]
+
+    def __str__(self):
+        return self.name

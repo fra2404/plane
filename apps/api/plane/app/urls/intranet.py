@@ -4,7 +4,13 @@
 
 from django.urls import path
 
-from plane.app.views import IntranetDeviceViewSet, IntranetLinkViewSet, IntranetNewsViewSet
+from plane.app.views import (
+    IntranetClientViewSet,
+    IntranetContactViewSet,
+    IntranetDeviceViewSet,
+    IntranetLinkViewSet,
+    IntranetNewsViewSet,
+)
 
 urlpatterns = [
     path(
@@ -38,5 +44,25 @@ urlpatterns = [
         "workspaces/<str:slug>/intranet/news/<uuid:pk>/",
         IntranetNewsViewSet.as_view({"get": "retrieve", "patch": "partial_update", "delete": "destroy"}),
         name="workspace-intranet-news-item",
+    ),
+    path(
+        "workspaces/<str:slug>/intranet/clients/",
+        IntranetClientViewSet.as_view({"get": "list", "post": "create"}),
+        name="workspace-intranet-clients",
+    ),
+    path(
+        "workspaces/<str:slug>/intranet/clients/<uuid:pk>/",
+        IntranetClientViewSet.as_view({"get": "retrieve", "patch": "partial_update", "delete": "destroy"}),
+        name="workspace-intranet-client",
+    ),
+    path(
+        "workspaces/<str:slug>/intranet/contacts/",
+        IntranetContactViewSet.as_view({"get": "list", "post": "create"}),
+        name="workspace-intranet-contacts",
+    ),
+    path(
+        "workspaces/<str:slug>/intranet/contacts/<uuid:pk>/",
+        IntranetContactViewSet.as_view({"get": "retrieve", "patch": "partial_update", "delete": "destroy"}),
+        name="workspace-intranet-contact",
     ),
 ]

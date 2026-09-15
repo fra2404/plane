@@ -335,6 +335,12 @@ class WorkspaceWorklogSummaryEndpoint(BaseAPIView):
             .order_by("-month", "-duration")
         )
 
+        project_rows = list(
+            worklogs.values("project_id", "project__name", "project__budget_hours")
+            .annotate(duration=Sum("duration"), worklog_count=Count("id"))
+            .order_by("-duration")
+        )
+
         actor_ids = {row["actor_id"] for row in rows if row["actor_id"]}
         actor_ids |= {row["actor_id"] for row in user_totals_rows if row["actor_id"]}
         actor_ids |= {row["actor_id"] for row in monthly_user_rows if row["actor_id"]}
@@ -388,6 +394,17 @@ class WorkspaceWorklogSummaryEndpoint(BaseAPIView):
 
         total_logged_time = sum(row["duration"] for row in results)
 
+        project_totals = [
+            {
+                "project_id": str(row["project_id"]) if row["project_id"] else None,
+                "project_name": row["project__name"],
+                "budget_hours": row["project__budget_hours"],
+                "duration": row["duration"] or 0,
+                "worklog_count": row["worklog_count"],
+            }
+            for row in project_rows
+        ]
+
         return Response(
             {
                 "group_by": "user-task",
@@ -396,6 +413,7 @@ class WorkspaceWorklogSummaryEndpoint(BaseAPIView):
                 "user_totals": user_totals,
                 "monthly_totals": monthly_totals,
                 "monthly_user_totals": monthly_user_totals,
+                "project_totals": project_totals,
             },
             status=status.HTTP_200_OK,
         )

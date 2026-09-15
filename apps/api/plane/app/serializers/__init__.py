@@ -128,7 +128,13 @@ from .exporter import ExporterHistorySerializer
 
 from .worklog import IssueWorklogSerializer
 
-from .intranet import IntranetDeviceSerializer, IntranetLinkSerializer, IntranetNewsSerializer
+from .intranet import (
+    IntranetClientSerializer,
+    IntranetContactSerializer,
+    IntranetDeviceSerializer,
+    IntranetLinkSerializer,
+    IntranetNewsSerializer,
+)
 
 from .webhook import WebhookSerializer, WebhookLogSerializer
 

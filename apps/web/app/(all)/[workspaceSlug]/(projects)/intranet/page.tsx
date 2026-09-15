@@ -12,7 +12,15 @@ import { ExternalLink, Pencil, Plus, Trash2 } from "lucide-react";
 import { EUserPermissions, EUserPermissionsLevel } from "@plane/constants";
 import { Button } from "@plane/propel/button";
 import { TOAST_TYPE, setToast } from "@plane/propel/toast";
-import type { TIntranetDevice, TIntranetDeviceType, TIntranetLink, TIntranetNews } from "@plane/types";
+import type {
+  TIntranetClient,
+  TIntranetClientStatus,
+  TIntranetContact,
+  TIntranetDevice,
+  TIntranetDeviceType,
+  TIntranetLink,
+  TIntranetNews,
+} from "@plane/types";
 import { Input, TextArea } from "@plane/ui";
 // components
 import { PageHead } from "@/components/core/page-title";
@@ -23,7 +31,7 @@ import { useUserPermissions } from "@/hooks/store/user";
 
 const intranetService = new IntranetService();
 
-type TTab = "ip" | "links" | "news";
+type TTab = "ip" | "links" | "news" | "clients" | "contacts";
 
 const DEVICE_TYPES: TIntranetDeviceType[] = ["server", "vm", "container", "dispositivo", "altro"];
 
@@ -38,6 +46,25 @@ const emptyDevice: Partial<TIntranetDevice> = {
 
 const emptyLink: Partial<TIntranetLink> = { label: "", url: "", category: "", description: "", sort_order: 65535 };
 const emptyNews: Partial<TIntranetNews> = { title: "", description: "", tags: [] };
+const emptyClient: Partial<TIntranetClient> = {
+  name: "",
+  vat: "",
+  email: "",
+  phone: "",
+  website: "",
+  address: "",
+  notes: "",
+  status: "active",
+};
+const emptyContact: Partial<TIntranetContact> = {
+  client: null,
+  name: "",
+  role: "",
+  email: "",
+  phone: "",
+  mobile: "",
+  notes: "",
+};
 
 const formatDate = (value: string) => {
   const date = new Date(value);
@@ -54,11 +81,15 @@ const IntranetPage = observer(function IntranetPage() {
   const [devices, setDevices] = useState<TIntranetDevice[]>([]);
   const [links, setLinks] = useState<TIntranetLink[]>([]);
   const [news, setNews] = useState<TIntranetNews[]>([]);
+  const [clients, setClients] = useState<TIntranetClient[]>([]);
+  const [contacts, setContacts] = useState<TIntranetContact[]>([]);
   const [search, setSearch] = useState("");
 
   const [deviceForm, setDeviceForm] = useState<Partial<TIntranetDevice> | null>(null);
   const [linkForm, setLinkForm] = useState<Partial<TIntranetLink> | null>(null);
   const [newsForm, setNewsForm] = useState<Partial<TIntranetNews> | null>(null);
+  const [clientForm, setClientForm] = useState<Partial<TIntranetClient> | null>(null);
+  const [contactForm, setContactForm] = useState<Partial<TIntranetContact> | null>(null);
   const [tagsInput, setTagsInput] = useState("");
 
   const canAdmin = allowPermissions([EUserPermissions.ADMIN], EUserPermissionsLevel.WORKSPACE);
@@ -69,14 +100,18 @@ const IntranetPage = observer(function IntranetPage() {
     setIsLoading(true);
     setHasError(false);
     try {
-      const [devicesData, linksData, newsData] = await Promise.all([
+      const [devicesData, linksData, newsData, clientsData, contactsData] = await Promise.all([
         intranetService.listDevices(workspaceSlug),
         intranetService.listLinks(workspaceSlug),
         intranetService.listNews(workspaceSlug),
+        intranetService.listClients(workspaceSlug),
+        intranetService.listContacts(workspaceSlug),
       ]);
       setDevices(devicesData ?? []);
       setLinks(linksData ?? []);
       setNews(newsData ?? []);
+      setClients(clientsData ?? []);
+      setContacts(contactsData ?? []);
     } catch {
       setHasError(true);
     } finally {
@@ -188,10 +223,66 @@ const IntranetPage = observer(function IntranetPage() {
     }
   };
 
+  const saveClient = async () => {
+    if (!workspaceSlug || !clientForm?.name?.trim()) return;
+    try {
+      if (clientForm.id) {
+        const updated = await intranetService.updateClient(workspaceSlug, clientForm.id, clientForm);
+        setClients((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
+      } else {
+        const created = await intranetService.createClient(workspaceSlug, clientForm);
+        setClients((prev) => [...prev, created]);
+      }
+      setClientForm(null);
+    } catch {
+      notifyError();
+    }
+  };
+
+  const removeClient = async (item: TIntranetClient) => {
+    if (!workspaceSlug) return;
+    try {
+      await intranetService.deleteClient(workspaceSlug, item.id);
+      setClients((prev) => prev.filter((entry) => entry.id !== item.id));
+    } catch {
+      notifyError();
+    }
+  };
+
+  const saveContact = async () => {
+    if (!workspaceSlug || !contactForm?.name?.trim()) return;
+    try {
+      if (contactForm.id) {
+        const updated = await intranetService.updateContact(workspaceSlug, contactForm.id, contactForm);
+        setContacts((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
+      } else {
+        const created = await intranetService.createContact(workspaceSlug, contactForm);
+        setContacts((prev) => [...prev, created]);
+      }
+      setContactForm(null);
+    } catch {
+      notifyError();
+    }
+  };
+
+  const removeContact = async (item: TIntranetContact) => {
+    if (!workspaceSlug) return;
+    try {
+      await intranetService.deleteContact(workspaceSlug, item.id);
+      setContacts((prev) => prev.filter((entry) => entry.id !== item.id));
+    } catch {
+      notifyError();
+    }
+  };
+
+  const clientName = (clientId: string | null) => clients.find((client) => client.id === clientId)?.name ?? "";
+
   const tabs: { key: TTab; label: string }[] = [
     { key: "ip", label: "IP e Dispositivi" },
     { key: "links", label: "Link utili" },
     { key: "news", label: "News" },
+    { key: "clients", label: "Clienti" },
+    { key: "contacts", label: "Contatti" },
   ];
 
   return (
@@ -240,6 +331,16 @@ const IntranetPage = observer(function IntranetPage() {
               }}
             >
               <Plus className="mr-1 size-3.5" /> Aggiungi news
+            </Button>
+          )}
+          {tab === "clients" && canAdmin && (
+            <Button variant="primary" size="sm" onClick={() => setClientForm({ ...emptyClient })}>
+              <Plus className="mr-1 size-3.5" /> Aggiungi cliente
+            </Button>
+          )}
+          {tab === "contacts" && canAdmin && (
+            <Button variant="primary" size="sm" onClick={() => setContactForm({ ...emptyContact })}>
+              <Plus className="mr-1 size-3.5" /> Aggiungi contatto
             </Button>
           )}
         </div>
@@ -533,6 +634,228 @@ const IntranetPage = observer(function IntranetPage() {
                     )}
                   </div>
                 ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {!isLoading && !hasError && tab === "clients" && (
+          <div className="space-y-4 pt-4">
+            {clientForm && canAdmin && (
+              <div className="grid grid-cols-1 gap-3 rounded-md border border-subtle p-4 md:grid-cols-3">
+                <Input
+                  placeholder="Ragione sociale *"
+                  value={clientForm.name ?? ""}
+                  onChange={(event) => setClientForm({ ...clientForm, name: event.target.value })}
+                />
+                <select
+                  className="rounded-md border border-subtle bg-surface-1 px-2.5 py-1.5 text-body-sm-regular"
+                  value={clientForm.status ?? "active"}
+                  onChange={(event) =>
+                    setClientForm({ ...clientForm, status: event.target.value as TIntranetClientStatus })
+                  }
+                >
+                  <option value="active">Attivo</option>
+                  <option value="prospect">Prospect</option>
+                  <option value="inactive">Inattivo</option>
+                </select>
+                <Input
+                  placeholder="P.IVA / VAT"
+                  value={clientForm.vat ?? ""}
+                  onChange={(event) => setClientForm({ ...clientForm, vat: event.target.value })}
+                />
+                <Input
+                  placeholder="Email"
+                  value={clientForm.email ?? ""}
+                  onChange={(event) => setClientForm({ ...clientForm, email: event.target.value })}
+                />
+                <Input
+                  placeholder="Telefono"
+                  value={clientForm.phone ?? ""}
+                  onChange={(event) => setClientForm({ ...clientForm, phone: event.target.value })}
+                />
+                <Input
+                  placeholder="Sito web"
+                  value={clientForm.website ?? ""}
+                  onChange={(event) => setClientForm({ ...clientForm, website: event.target.value })}
+                />
+                <Input
+                  placeholder="Indirizzo"
+                  value={clientForm.address ?? ""}
+                  onChange={(event) => setClientForm({ ...clientForm, address: event.target.value })}
+                />
+                <Input
+                  placeholder="Note"
+                  value={clientForm.notes ?? ""}
+                  onChange={(event) => setClientForm({ ...clientForm, notes: event.target.value })}
+                />
+                <div className="flex gap-2 md:col-span-3">
+                  <Button variant="primary" size="sm" onClick={saveClient}>
+                    Salva
+                  </Button>
+                  <Button variant="secondary" size="sm" onClick={() => setClientForm(null)}>
+                    Annulla
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {clients.length === 0 ? (
+              <p className="py-2 text-body-sm-regular text-tertiary">Nessun cliente.</p>
+            ) : (
+              <div className="overflow-hidden rounded-md border border-subtle">
+                <table className="w-full table-auto text-left text-body-sm-regular">
+                  <thead className="bg-surface-2 text-tertiary">
+                    <tr>
+                      <th className="px-3 py-2 font-medium">Ragione sociale</th>
+                      <th className="px-3 py-2 font-medium">P.IVA</th>
+                      <th className="px-3 py-2 font-medium">Email</th>
+                      <th className="px-3 py-2 font-medium">Telefono</th>
+                      <th className="px-3 py-2 font-medium">Stato</th>
+                      {canAdmin && <th className="px-3 py-2" />}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {clients.map((client) => (
+                      <tr key={client.id} className="border-t border-subtle">
+                        <td className="px-3 py-2 text-primary">{client.name}</td>
+                        <td className="px-3 py-2 text-secondary">{client.vat}</td>
+                        <td className="px-3 py-2 text-secondary">{client.email}</td>
+                        <td className="px-3 py-2 text-secondary">{client.phone}</td>
+                        <td className="px-3 py-2 text-secondary">{client.status}</td>
+                        {canAdmin && (
+                          <td className="px-3 py-2">
+                            <div className="flex items-center justify-end gap-1">
+                              <button
+                                type="button"
+                                className="rounded p-1 text-tertiary hover:text-primary"
+                                onClick={() => setClientForm({ ...client })}
+                              >
+                                <Pencil className="size-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                className="rounded p-1 text-tertiary hover:text-danger-primary"
+                                onClick={() => void removeClient(client)}
+                              >
+                                <Trash2 className="size-3.5" />
+                              </button>
+                            </div>
+                          </td>
+                        )}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
+        {!isLoading && !hasError && tab === "contacts" && (
+          <div className="space-y-4 pt-4">
+            {contactForm && canAdmin && (
+              <div className="grid grid-cols-1 gap-3 rounded-md border border-subtle p-4 md:grid-cols-3">
+                <select
+                  className="rounded-md border border-subtle bg-surface-1 px-2.5 py-1.5 text-body-sm-regular"
+                  value={contactForm.client ?? ""}
+                  onChange={(event) => setContactForm({ ...contactForm, client: event.target.value || null })}
+                >
+                  <option value="">Nessun cliente</option>
+                  {clients.map((client) => (
+                    <option key={client.id} value={client.id}>
+                      {client.name}
+                    </option>
+                  ))}
+                </select>
+                <Input
+                  placeholder="Nome *"
+                  value={contactForm.name ?? ""}
+                  onChange={(event) => setContactForm({ ...contactForm, name: event.target.value })}
+                />
+                <Input
+                  placeholder="Ruolo"
+                  value={contactForm.role ?? ""}
+                  onChange={(event) => setContactForm({ ...contactForm, role: event.target.value })}
+                />
+                <Input
+                  placeholder="Email"
+                  value={contactForm.email ?? ""}
+                  onChange={(event) => setContactForm({ ...contactForm, email: event.target.value })}
+                />
+                <Input
+                  placeholder="Telefono"
+                  value={contactForm.phone ?? ""}
+                  onChange={(event) => setContactForm({ ...contactForm, phone: event.target.value })}
+                />
+                <Input
+                  placeholder="Cellulare"
+                  value={contactForm.mobile ?? ""}
+                  onChange={(event) => setContactForm({ ...contactForm, mobile: event.target.value })}
+                />
+                <Input
+                  placeholder="Note"
+                  value={contactForm.notes ?? ""}
+                  onChange={(event) => setContactForm({ ...contactForm, notes: event.target.value })}
+                />
+                <div className="flex gap-2 md:col-span-3">
+                  <Button variant="primary" size="sm" onClick={saveContact}>
+                    Salva
+                  </Button>
+                  <Button variant="secondary" size="sm" onClick={() => setContactForm(null)}>
+                    Annulla
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {contacts.length === 0 ? (
+              <p className="py-2 text-body-sm-regular text-tertiary">Nessun contatto.</p>
+            ) : (
+              <div className="overflow-hidden rounded-md border border-subtle">
+                <table className="w-full table-auto text-left text-body-sm-regular">
+                  <thead className="bg-surface-2 text-tertiary">
+                    <tr>
+                      <th className="px-3 py-2 font-medium">Nome</th>
+                      <th className="px-3 py-2 font-medium">Cliente</th>
+                      <th className="px-3 py-2 font-medium">Ruolo</th>
+                      <th className="px-3 py-2 font-medium">Email</th>
+                      <th className="px-3 py-2 font-medium">Telefono</th>
+                      {canAdmin && <th className="px-3 py-2" />}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {contacts.map((contact) => (
+                      <tr key={contact.id} className="border-t border-subtle">
+                        <td className="px-3 py-2 text-primary">{contact.name}</td>
+                        <td className="px-3 py-2 text-secondary">{clientName(contact.client)}</td>
+                        <td className="px-3 py-2 text-secondary">{contact.role}</td>
+                        <td className="px-3 py-2 text-secondary">{contact.email}</td>
+                        <td className="px-3 py-2 text-secondary">{contact.phone || contact.mobile}</td>
+                        {canAdmin && (
+                          <td className="px-3 py-2">
+                            <div className="flex items-center justify-end gap-1">
+                              <button
+                                type="button"
+                                className="rounded p-1 text-tertiary hover:text-primary"
+                                onClick={() => setContactForm({ ...contact })}
+                              >
+                                <Pencil className="size-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                className="rounded p-1 text-tertiary hover:text-danger-primary"
+                                onClick={() => void removeContact(contact)}
+                              >
+                                <Trash2 className="size-3.5" />
+                              </button>
+                            </div>
+                          </td>
+                        )}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             )}
           </div>

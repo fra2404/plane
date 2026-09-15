@@ -26,6 +26,8 @@ export type TUserProfile = {
 
   use_case: string | undefined;
 
+  birthday?: string | null;
+
   billing_address_country: string | undefined;
   billing_address: string | undefined;
   has_billing_address: boolean;

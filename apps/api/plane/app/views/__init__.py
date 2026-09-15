@@ -141,7 +141,14 @@ from .issue.attachment import (
 from .issue.comment import IssueCommentViewSet, CommentReactionViewSet
 
 from .issue.worklog import IssueWorklogViewSet, WorkspaceWorklogSummaryEndpoint
-from .intranet import IntranetDeviceViewSet, IntranetLinkViewSet, IntranetNewsViewSet
+from .intranet import (
+    IntranetClientViewSet,
+    IntranetContactViewSet,
+    IntranetDeviceViewSet,
+    IntranetLinkViewSet,
+    IntranetNewsViewSet,
+)
+from .anniversary import WorkspaceAnniversaryEndpoint
 
 from .issue.label import LabelViewSet, BulkCreateIssueLabelsEndpoint
 

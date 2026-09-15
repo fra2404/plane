@@ -43,6 +43,7 @@ type TUserProfileForm = {
   role: string;
   language: string;
   user_timezone: string;
+  birthday: string;
 };
 
 type Props = {
@@ -78,6 +79,7 @@ export const GeneralProfileSettingsForm = observer(function GeneralProfileSettin
       role: profile.role || "Product / Project Manager",
       language: profile.language || "en",
       user_timezone: user.user_timezone || "Asia/Kolkata",
+      birthday: profile.birthday ?? "",
     },
   });
   // derived values
@@ -148,11 +150,12 @@ export const GeneralProfileSettingsForm = observer(function GeneralProfileSettin
 
     const profilePayload: Partial<TUserProfile> = {
       role: formData.role,
+      birthday: formData.birthday || null,
     };
 
     const updateCurrentUserDetail = updateCurrentUser(userPayload);
     const promises: Promise<IUser | TUserProfile | undefined>[] = [updateCurrentUserDetail];
-    if (profilePayload.role !== profile.role) {
+    if (profilePayload.role !== profile.role || (profilePayload.birthday ?? null) !== (profile.birthday ?? null)) {
       const updateCurrentUserProfile = updateUserProfile(profilePayload);
       promises.push(updateCurrentUserProfile);
     }
@@ -352,6 +355,24 @@ export const GeneralProfileSettingsForm = observer(function GeneralProfileSettin
                 {errors?.display_name && (
                   <span className="text-11 text-danger-primary">{errors?.display_name?.message}</span>
                 )}
+              </div>
+              <div className="flex flex-col gap-1">
+                <h4 className="text-13 font-medium text-secondary">Birthday</h4>
+                <Controller
+                  control={control}
+                  name="birthday"
+                  render={({ field: { value, onChange, ref } }) => (
+                    <Input
+                      id="birthday"
+                      name="birthday"
+                      type="date"
+                      value={value ?? ""}
+                      onChange={onChange}
+                      ref={ref}
+                      className="w-full rounded-md"
+                    />
+                  )}
+                />
               </div>
               <div className="flex flex-col gap-1">
                 <h4 className="text-13 font-medium text-secondary">

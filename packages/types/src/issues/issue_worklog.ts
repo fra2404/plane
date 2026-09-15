@@ -77,6 +77,13 @@ export type TWorkspaceWorklogSummary = {
   user_totals: TWorkspaceWorklogUserTotal[];
   monthly_totals: TWorkspaceWorklogMonthTotal[];
   monthly_user_totals: TWorkspaceWorklogMonthUserTotal[];
+  project_totals?: {
+    project_id: string | null;
+    project_name: string;
+    budget_hours: number | null;
+    duration: number;
+    worklog_count: number;
+  }[];
 };
 
 export type TWorkspaceWorklogSummaryParams = {

@@ -82,6 +82,7 @@ export type TUserProfile = {
   created_at: Date | string;
   updated_at: Date | string;
   start_of_the_week: EStartOfTheWeek;
+  birthday?: string | null;
 };
 
 export interface IInstanceAdminStatus {

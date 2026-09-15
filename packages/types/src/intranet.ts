@@ -44,3 +44,44 @@ export type TIntranetNews = {
   created_at: string;
   updated_at: string;
 };
+
+export type TIntranetClientStatus = "active" | "prospect" | "inactive";
+
+export type TIntranetClient = {
+  id: string;
+  workspace: string;
+  name: string;
+  vat: string;
+  email: string;
+  phone: string;
+  website: string;
+  address: string;
+  notes: string;
+  status: TIntranetClientStatus;
+  created_at: string;
+  updated_at: string;
+};
+
+export type TIntranetContact = {
+  id: string;
+  workspace: string;
+  client: string | null;
+  name: string;
+  role: string;
+  email: string;
+  phone: string;
+  mobile: string;
+  notes: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type TAnniversaryEvent = {
+  user_id: string;
+  display_name: string | null;
+  avatar_url: string | null;
+  type: "birthday" | "anniversary";
+  date: string;
+  days_until: number;
+  years: number | null;
+};

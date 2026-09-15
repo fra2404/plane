@@ -5,7 +5,7 @@
  */
 
 import { API_BASE_URL } from "@plane/constants";
-import type { TIntranetDevice, TIntranetLink, TIntranetNews } from "@plane/types";
+import type { TIntranetClient, TIntranetContact, TIntranetDevice, TIntranetLink, TIntranetNews } from "@plane/types";
 // services
 import { APIService } from "@/services/api.service";
 
@@ -111,6 +111,80 @@ export class IntranetService extends APIService {
 
   async deleteNews(workspaceSlug: string, newsId: string): Promise<void> {
     return this.delete(`/api/workspaces/${workspaceSlug}/intranet/news/${newsId}/`)
+      .then((response) => response?.data)
+      .catch((error) => {
+        throw error?.response?.data;
+      });
+  }
+
+  // Clients
+  async listClients(workspaceSlug: string): Promise<TIntranetClient[]> {
+    return this.get(`/api/workspaces/${workspaceSlug}/intranet/clients/`)
+      .then((response) => response?.data)
+      .catch((error) => {
+        throw error?.response?.data;
+      });
+  }
+
+  async createClient(workspaceSlug: string, data: Partial<TIntranetClient>): Promise<TIntranetClient> {
+    return this.post(`/api/workspaces/${workspaceSlug}/intranet/clients/`, data)
+      .then((response) => response?.data)
+      .catch((error) => {
+        throw error?.response?.data;
+      });
+  }
+
+  async updateClient(
+    workspaceSlug: string,
+    clientId: string,
+    data: Partial<TIntranetClient>
+  ): Promise<TIntranetClient> {
+    return this.patch(`/api/workspaces/${workspaceSlug}/intranet/clients/${clientId}/`, data)
+      .then((response) => response?.data)
+      .catch((error) => {
+        throw error?.response?.data;
+      });
+  }
+
+  async deleteClient(workspaceSlug: string, clientId: string): Promise<void> {
+    return this.delete(`/api/workspaces/${workspaceSlug}/intranet/clients/${clientId}/`)
+      .then((response) => response?.data)
+      .catch((error) => {
+        throw error?.response?.data;
+      });
+  }
+
+  // Contacts
+  async listContacts(workspaceSlug: string): Promise<TIntranetContact[]> {
+    return this.get(`/api/workspaces/${workspaceSlug}/intranet/contacts/`)
+      .then((response) => response?.data)
+      .catch((error) => {
+        throw error?.response?.data;
+      });
+  }
+
+  async createContact(workspaceSlug: string, data: Partial<TIntranetContact>): Promise<TIntranetContact> {
+    return this.post(`/api/workspaces/${workspaceSlug}/intranet/contacts/`, data)
+      .then((response) => response?.data)
+      .catch((error) => {
+        throw error?.response?.data;
+      });
+  }
+
+  async updateContact(
+    workspaceSlug: string,
+    contactId: string,
+    data: Partial<TIntranetContact>
+  ): Promise<TIntranetContact> {
+    return this.patch(`/api/workspaces/${workspaceSlug}/intranet/contacts/${contactId}/`, data)
+      .then((response) => response?.data)
+      .catch((error) => {
+        throw error?.response?.data;
+      });
+  }
+
+  async deleteContact(workspaceSlug: string, contactId: string): Promise<void> {
+    return this.delete(`/api/workspaces/${workspaceSlug}/intranet/contacts/${contactId}/`)
       .then((response) => response?.data)
       .catch((error) => {
         throw error?.response?.data;
