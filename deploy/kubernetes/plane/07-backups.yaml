@@ -1,0 +1,120 @@
+# Automated backups for Plane (Postgres + MinIO uploads) on a Longhorn PVC.
+# Retention: 7 daily + 4 weekly + 6 monthly (database dumps).
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: plane-backups
+  namespace: plane
+spec:
+  accessModes: ["ReadWriteOnce"]
+  storageClassName: longhorn
+  resources:
+    requests:
+      storage: 20Gi
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: plane-db-backup
+  namespace: plane
+spec:
+  schedule: "15 2 * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: pg-dump
+              image: postgres:15.7-alpine
+              env:
+                - name: PGHOST
+                  value: plane-db
+                - name: PGUSER
+                  value: plane
+                - name: PGDATABASE
+                  value: plane
+                - name: PGPASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: plane-secrets
+                      key: POSTGRES_PASSWORD
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  set -e
+                  mkdir -p /backups/db
+                  TS=$(date +%Y%m%d-%H%M)
+                  TMP=/backups/db/tmp-$TS.sql.gz
+                  pg_dump -h "$PGHOST" -U "$PGUSER" -d "$PGDATABASE" | gzip > "$TMP"
+                  cp "$TMP" "/backups/db/plane-daily-$TS.sql.gz"
+                  [ "$(date +%u)" = "7" ] && cp "$TMP" "/backups/db/plane-weekly-$TS.sql.gz" || true
+                  [ "$(date +%d)" = "01" ] && cp "$TMP" "/backups/db/plane-monthly-$TS.sql.gz" || true
+                  rm -f "$TMP"
+                  prune() {
+                    prefix="$1"; keep="$2";
+                    ls -1t ${prefix}* 2>/dev/null | tail -n +$((keep + 1)) | while read -r f; do rm -f "$f"; done
+                  }
+                  prune /backups/db/plane-daily- 7
+                  prune /backups/db/plane-weekly- 4
+                  prune /backups/db/plane-monthly- 6
+                  echo "DB backup completed: plane-daily-$TS.sql.gz"
+              volumeMounts:
+                - name: backups
+                  mountPath: /backups
+          volumes:
+            - name: backups
+              persistentVolumeClaim:
+                claimName: plane-backups
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: plane-uploads-backup
+  namespace: plane
+spec:
+  schedule: "45 2 * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: mirror
+              image: minio/mc
+              env:
+                - name: MINIO_ENDPOINT
+                  value: http://plane-minio:9000
+                - name: MINIO_ROOT_USER
+                  valueFrom:
+                    secretKeyRef:
+                      name: plane-secrets
+                      key: AWS_ACCESS_KEY_ID
+                - name: MINIO_ROOT_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: plane-secrets
+                      key: AWS_SECRET_ACCESS_KEY
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  set -e
+                  mc alias set plane "$MINIO_ENDPOINT" "$MINIO_ROOT_USER" "$MINIO_ROOT_PASSWORD"
+                  mkdir -p /backups/uploads
+                  mc mirror --overwrite --quiet plane/uploads /backups/uploads
+                  echo "Uploads backup completed"
+              volumeMounts:
+                - name: backups
+                  mountPath: /backups
+          volumes:
+            - name: backups
+              persistentVolumeClaim:
+                claimName: plane-backups
