@@ -17,15 +17,14 @@ function truncate(value: string, max: number): string {
 
 function alertTarget(alert: AlertmanagerAlert): string {
   const { labels } = alert;
-  return (
-    labels.instance ??
-    labels.node ??
-    labels.pod ??
-    labels.job ??
-    labels.alertname ??
-    alert.fingerprint ??
-    "unknown target"
-  );
+  const name = labels.node ?? labels.host ?? labels.pod ?? labels.deployment ?? labels.job;
+  const address = labels.instance;
+
+  if (name && address && name !== address) {
+    return `${name} (${address})`;
+  }
+
+  return name ?? address ?? labels.alertname ?? alert.fingerprint ?? "unknown target";
 }
 
 function alertDescription(alert: AlertmanagerAlert): string {

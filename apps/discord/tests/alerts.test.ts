@@ -35,6 +35,20 @@ describe("buildAlertMessage", () => {
     expect(embed.fields?.some((field) => field.name === "Severity" && field.value === "critical")).toBe(true);
   });
 
+  it("shows both the node name and the address", () => {
+    const { embeds } = buildAlertMessage(
+      buildPayload({
+        alerts: [
+          nodeAlert({
+            labels: { alertname: "NodeDown", node: "algios-b602", instance: "10.11.13.5:9100", severity: "critical" },
+          }),
+        ],
+      })
+    );
+
+    expect(embeds[0].description).toContain("algios-b602 (10.11.13.5:9100)");
+  });
+
   it("builds a resolved embed", () => {
     const { embeds } = buildAlertMessage(
       buildPayload({ status: "resolved", alerts: [nodeAlert({ status: "resolved" })] })
