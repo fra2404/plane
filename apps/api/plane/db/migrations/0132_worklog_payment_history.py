@@ -20,6 +20,10 @@ class Migration(migrations.Migration):
             model_name="worklogpayment",
             name="worklog_payment_unique_project_actor_month",
         ),
+        migrations.RemoveField(
+            model_name="worklogpayment",
+            name="is_paid",
+        ),
         migrations.AlterModelOptions(
             name="worklogpayment",
             options={
