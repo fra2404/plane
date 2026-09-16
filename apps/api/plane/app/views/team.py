@@ -72,7 +72,11 @@ class WorkspaceTeamViewSet(BaseViewSet):
         profile = WorkspaceTeamMember.objects.filter(
             workspace=workspace, user_id=user_id, deleted_at__isnull=True
         ).first()
-        serializer = WorkspaceTeamMemberSerializer(profile, data=request.data, partial=bool(profile))
+        serializer = WorkspaceTeamMemberSerializer(
+            profile,
+            data={**request.data, "user": str(user_id)},
+            partial=bool(profile),
+        )
         if serializer.is_valid():
             if profile:
                 serializer.save(updated_by=request.user)
