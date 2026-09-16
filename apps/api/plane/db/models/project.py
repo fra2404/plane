@@ -97,6 +97,8 @@ class Project(BaseModel):
     intake_view = models.BooleanField(default=False)
     is_time_tracking_enabled = models.BooleanField(default=True)
     budget_hours = models.FloatField(null=True, blank=True)
+    # Optional monthly overrides: {"2026-09": 80, "2026-10": 60}
+    budget_months = models.JSONField(default=dict, blank=True)
     is_issue_type_enabled = models.BooleanField(default=False)
     guest_view_all_features = models.BooleanField(default=False)
     cover_image = models.TextField(blank=True, null=True)

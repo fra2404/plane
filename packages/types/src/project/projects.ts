@@ -61,6 +61,7 @@ export interface IProject extends IPartialProject {
   next_work_item_sequence?: number;
   is_time_tracking_enabled?: boolean;
   budget_hours?: number | null;
+  budget_months?: Record<string, number>;
 }
 
 export type TProjectAnalyticsCountParams = {

@@ -39,9 +39,12 @@ export function buildAlertMessage(payload: AlertmanagerPayload): { embeds: APIEm
   const alertname = payload.commonLabels?.alertname ?? payload.groupLabels?.alertname ?? "Alert";
 
   const lines = payload.alerts.slice(0, MAX_ALERT_LINES).map((alert) => {
-    const icon = alert.status === "firing" ? "🔴" : "✅";
+    const target = alertTarget(alert);
+    if (alert.status !== "firing") {
+      return `✅ **${target}** — rientrato`;
+    }
     const description = alertDescription(alert);
-    return `${icon} **${alertTarget(alert)}**${description ? ` — ${description}` : ""}`;
+    return `🔴 **${target}**${description ? ` — ${description}` : ""}`;
   });
 
   const hidden = payload.alerts.length - MAX_ALERT_LINES;

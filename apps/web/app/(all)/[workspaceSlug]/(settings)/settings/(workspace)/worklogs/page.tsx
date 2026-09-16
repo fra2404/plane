@@ -51,7 +51,7 @@ const WorkspaceWorklogsSettingsPage = observer(function WorkspaceWorklogsSetting
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
   const [selectedMonth, setSelectedMonth] = useState<string>("all");
-  const [budgetDraft, setBudgetDraft] = useState<Record<string, string>>({});
+  const [budgetDraft, setBudgetDraft] = useState<Record<string, { general?: string; month?: string }>>({});
   const [savingBudget, setSavingBudget] = useState<string | null>(null);
 
   const canAdmin = allowPermissions([EUserPermissions.ADMIN], EUserPermissionsLevel.WORKSPACE);
@@ -60,21 +60,59 @@ const WorkspaceWorklogsSettingsPage = observer(function WorkspaceWorklogsSetting
 
   const hours = (seconds: number) => (seconds / 3600).toFixed(1);
 
-  const saveBudget = async (projectId: string) => {
+  const setDraft = (projectId: string, key: "general" | "month", value: string) =>
+    setBudgetDraft((prev) => ({ ...prev, [projectId]: { ...prev[projectId], [key]: value } }));
+
+  const fetchSummary = async () => {
+    if (!workspaceSlug || !canAdmin) return;
+    setIsLoading(true);
+    setHasError(false);
+    const params =
+      selectedMonth === "all" ? undefined : { date_from: `${selectedMonth}-01`, date_to: monthEnd(selectedMonth) };
+    try {
+      const response = await issueService.fetchWorkspaceWorklogSummary(workspaceSlug, params);
+      setSummary(response);
+    } catch {
+      setHasError(true);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const saveBudget = async (projectId: string, budgetMonths: Record<string, number> | null | undefined) => {
     if (!workspaceSlug) return;
-    const raw = budgetDraft[projectId];
-    if (raw === undefined) return;
-    const trimmed = raw.trim();
-    const value = trimmed === "" ? null : Number(trimmed);
-    if (value !== null && Number.isNaN(value)) return;
+    const draft = budgetDraft[projectId] ?? {};
+    const payload: { budget_hours?: number | null; budget_months?: Record<string, number> } = {};
+
+    if (draft.general !== undefined) {
+      const trimmed = draft.general.trim();
+      const value = trimmed === "" ? null : Number(trimmed);
+      if (value !== null && Number.isNaN(value)) return;
+      payload.budget_hours = value;
+    }
+
+    if (selectedMonth !== "all" && draft.month !== undefined) {
+      const nextMonths = { ...(budgetMonths ?? {}) };
+      const trimmed = draft.month.trim();
+      if (trimmed === "") {
+        delete nextMonths[selectedMonth];
+      } else {
+        const value = Number(trimmed);
+        if (Number.isNaN(value)) return;
+        nextMonths[selectedMonth] = value;
+      }
+      payload.budget_months = nextMonths;
+    }
+
     setSavingBudget(projectId);
     try {
-      await updateProject(workspaceSlug, projectId, { budget_hours: value });
+      await updateProject(workspaceSlug, projectId, payload);
       setBudgetDraft((prev) => {
         const next = { ...prev };
         delete next[projectId];
         return next;
       });
+      await fetchSummary();
     } catch {
       // ignore; input keeps the value
     } finally {
@@ -207,6 +245,10 @@ const WorkspaceWorklogsSettingsPage = observer(function WorkspaceWorklogsSetting
 
             <div>
               <h5 className="pb-2 text-body-sm-medium text-secondary">Per progetto (budget ore)</h5>
+              <p className="pb-2 text-body-xs-regular text-tertiary">
+                Budget generale del progetto; selezionando un mese puoi impostare un budget specifico che ha priorità su
+                quello generale.
+              </p>
               {projectTotals.length === 0 ? (
                 <p className="py-2 text-body-sm-regular text-tertiary">{t("activity_empty_state.no_worklogs")}</p>
               ) : (
@@ -215,7 +257,10 @@ const WorkspaceWorklogsSettingsPage = observer(function WorkspaceWorklogsSetting
                     <thead className="bg-surface-2 text-tertiary">
                       <tr>
                         <th className="px-3 py-2 font-medium">Progetto</th>
-                        <th className="px-3 py-2 text-right font-medium">Budget (h)</th>
+                        <th className="px-3 py-2 text-right font-medium">Budget gen. (h)</th>
+                        {selectedMonth !== "all" && (
+                          <th className="px-3 py-2 text-right font-medium">Budget mese (h)</th>
+                        )}
                         <th className="px-3 py-2 text-right font-medium">Registrate (h)</th>
                         <th className="px-3 py-2 text-right font-medium">Residuo (h)</th>
                         <th className="px-3 py-2" />
@@ -226,9 +271,13 @@ const WorkspaceWorklogsSettingsPage = observer(function WorkspaceWorklogsSetting
                         if (!item.project_id) return null;
                         const projectId = item.project_id;
                         const logged = item.duration / 3600;
-                        const budget = item.budget_hours;
-                        const remaining = budget != null ? budget - logged : null;
-                        const draft = budgetDraft[projectId];
+                        const generalBudget = item.budget_hours;
+                        const monthBudget =
+                          selectedMonth === "all" ? null : (item.budget_months?.[selectedMonth] ?? null);
+                        const effective = monthBudget ?? generalBudget;
+                        const remaining = effective != null ? effective - logged : null;
+                        const draft = budgetDraft[projectId] ?? {};
+                        const dirty = draft.general !== undefined || draft.month !== undefined;
                         return (
                           <tr key={projectId} className="border-t border-subtle">
                             <td className="px-3 py-2 text-primary">{item.project_name}</td>
@@ -238,13 +287,24 @@ const WorkspaceWorklogsSettingsPage = observer(function WorkspaceWorklogsSetting
                                 step="0.5"
                                 min="0"
                                 placeholder="—"
-                                value={draft ?? (budget != null ? String(budget) : "")}
-                                onChange={(event) =>
-                                  setBudgetDraft((prev) => ({ ...prev, [projectId]: event.target.value }))
-                                }
+                                value={draft.general ?? (generalBudget != null ? String(generalBudget) : "")}
+                                onChange={(event) => setDraft(projectId, "general", event.target.value)}
                                 className="w-20 rounded border border-subtle bg-surface-1 px-2 py-1 text-right text-body-sm-regular text-primary outline-none"
                               />
                             </td>
+                            {selectedMonth !== "all" && (
+                              <td className="px-3 py-2 text-right">
+                                <input
+                                  type="number"
+                                  step="0.5"
+                                  min="0"
+                                  placeholder="—"
+                                  value={draft.month ?? (monthBudget != null ? String(monthBudget) : "")}
+                                  onChange={(event) => setDraft(projectId, "month", event.target.value)}
+                                  className="w-20 rounded border border-subtle bg-surface-1 px-2 py-1 text-right text-body-sm-regular text-primary outline-none"
+                                />
+                              </td>
+                            )}
                             <td className="px-3 py-2 text-right text-secondary">{hours(item.duration)}</td>
                             <td
                               className={`px-3 py-2 text-right font-medium ${
@@ -254,11 +314,11 @@ const WorkspaceWorklogsSettingsPage = observer(function WorkspaceWorklogsSetting
                               {remaining != null ? remaining.toFixed(1) : "—"}
                             </td>
                             <td className="px-3 py-2 text-right">
-                              {draft !== undefined && (
+                              {dirty && (
                                 <button
                                   type="button"
                                   disabled={savingBudget === projectId}
-                                  onClick={() => void saveBudget(projectId)}
+                                  onClick={() => void saveBudget(projectId, item.budget_months)}
                                   className="rounded bg-accent-primary px-2 py-1 text-11 text-white disabled:opacity-50"
                                 >
                                   Salva

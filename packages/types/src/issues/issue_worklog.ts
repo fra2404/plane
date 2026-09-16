@@ -81,6 +81,7 @@ export type TWorkspaceWorklogSummary = {
     project_id: string | null;
     project_name: string;
     budget_hours: number | null;
+    budget_months?: Record<string, number> | null;
     duration: number;
     worklog_count: number;
   }[];

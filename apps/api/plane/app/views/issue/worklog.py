@@ -336,7 +336,7 @@ class WorkspaceWorklogSummaryEndpoint(BaseAPIView):
         )
 
         project_rows = list(
-            worklogs.values("project_id", "project__name", "project__budget_hours")
+            worklogs.values("project_id", "project__name", "project__budget_hours", "project__budget_months")
             .annotate(duration=Sum("duration"), worklog_count=Count("id"))
             .order_by("-duration")
         )
@@ -399,6 +399,7 @@ class WorkspaceWorklogSummaryEndpoint(BaseAPIView):
                 "project_id": str(row["project_id"]) if row["project_id"] else None,
                 "project_name": row["project__name"],
                 "budget_hours": row["project__budget_hours"],
+                "budget_months": row["project__budget_months"] or {},
                 "duration": row["duration"] or 0,
                 "worklog_count": row["worklog_count"],
             }
