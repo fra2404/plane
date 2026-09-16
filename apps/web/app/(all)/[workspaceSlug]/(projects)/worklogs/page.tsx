@@ -8,5 +8,9 @@
 import { WorkspaceWorklogsRecap } from "@/components/worklogs/workspace-worklogs-recap";
 
 export default function WorkspaceWorklogsPage() {
-  return <WorkspaceWorklogsRecap />;
+  return (
+    <div className="w-full p-4 lg:p-6">
+      <WorkspaceWorklogsRecap />
+    </div>
+  );
 }
