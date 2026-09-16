@@ -57,6 +57,29 @@ describe("buildAlertMessage", () => {
 
     expect(embed.title).toBe("✅ Rientrato: NodeDown");
     expect(embed.color).toBe(0x22c55e);
+    expect(embed.description).toContain("rientrato");
+    expect(embed.description).not.toContain("unreachable");
+  });
+
+  it("marks resolved alerts as rientrato in a mixed group", () => {
+    const { embeds } = buildAlertMessage(
+      buildPayload({
+        status: "firing",
+        alerts: [
+          nodeAlert({
+            labels: { alertname: "NodeDown", node: "k3s-worker1", instance: "10.11.13.3:9100" },
+          }),
+          nodeAlert({
+            status: "resolved",
+            labels: { alertname: "NodeDown", node: "algios-b602", instance: "10.11.13.5:9100" },
+          }),
+        ],
+      })
+    );
+
+    const description = embeds[0].description ?? "";
+    expect(description).toContain("🔴 **k3s-worker1 (10.11.13.3:9100)**");
+    expect(description).toContain("✅ **algios-b602 (10.11.13.5:9100)** — rientrato");
   });
 
   it("truncates to 15 alert lines", () => {
