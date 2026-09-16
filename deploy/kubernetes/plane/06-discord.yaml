@@ -14,7 +14,7 @@ data:
   DISCORD_GUILD_ID: "1548625603433996388"
   # key = Plane project identifier (or UUID) -> Discord channel id
   DISCORD_CHANNEL_MAPPING: '{"ALGIOS":"1548625935866007552","SMILINGDOG":"1548625916014370877"}'
-  DISCORD_USER_MAPPING: '{"763120995091218462":"francesco.albano@mindhouse.it","588633871029895169":"tommasogioia.s@gmail.com"}'
+  DISCORD_USER_MAPPING: '{"763120995091218462":"francesco.albano@mindhouse.it","588633871029895169":"tommasogioia.s@gmail.com","1016665683829985290":"fabriziobozzotta@gmail.com","1504746161683038261":"vittoriettic@gmail.com","1419669010789695629":"eglt.graphicdesign@gmail.com"}'
   # Auto-resolve a channel by project name/identifier when no explicit mapping exists
   # (e.g. project "Verbatim" -> channel #verbatim).
   DISCORD_AUTO_CHANNEL_MATCH: "true"
