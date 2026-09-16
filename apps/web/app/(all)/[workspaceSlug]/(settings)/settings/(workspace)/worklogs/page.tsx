@@ -39,6 +39,8 @@ const formatMonth = (month: string) => {
   return date.toLocaleDateString(undefined, { year: "numeric", month: "long" });
 };
 
+const hours = (seconds: number) => (seconds / 3600).toFixed(1);
+
 const WorkspaceWorklogsSettingsPage = observer(function WorkspaceWorklogsSettingsPage() {
   const { workspaceSlug } = useParams();
   const { t } = useTranslation();
@@ -57,8 +59,6 @@ const WorkspaceWorklogsSettingsPage = observer(function WorkspaceWorklogsSetting
   const canAdmin = allowPermissions([EUserPermissions.ADMIN], EUserPermissionsLevel.WORKSPACE);
 
   const projectTotals = summary?.project_totals ?? overview?.project_totals ?? [];
-
-  const hours = (seconds: number) => (seconds / 3600).toFixed(1);
 
   const setDraft = (projectId: string, key: "general" | "month", value: string) =>
     setBudgetDraft((prev) => ({ ...prev, [projectId]: { ...prev[projectId], [key]: value } }));
@@ -92,7 +92,7 @@ const WorkspaceWorklogsSettingsPage = observer(function WorkspaceWorklogsSetting
     }
 
     if (selectedMonth !== "all" && draft.month !== undefined) {
-      const nextMonths = { ...(budgetMonths ?? {}) };
+      const nextMonths = { ...budgetMonths };
       const trimmed = draft.month.trim();
       if (trimmed === "") {
         delete nextMonths[selectedMonth];
