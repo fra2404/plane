@@ -21,19 +21,19 @@
     --alpha-white-1100: oklch(1 0 0 / 90%);
     --alpha-white-1200: oklch(1 0 0 / 95%);
     /* Black alpha */
-    --alpha-black-0: oklch(0.1689 0.1733 298.81 / 0%);
-    --alpha-black-100: oklch(0.1689 0.1733 298.81 / 5%);
-    --alpha-black-200: oklch(0.1689 0.1733 298.81 / 10%);
-    --alpha-black-300: oklch(0.1689 0.1733 298.81 / 15%);
-    --alpha-black-400: oklch(0.1689 0.1733 298.81 / 20%);
-    --alpha-black-500: oklch(0.1689 0.1733 298.81 / 30%);
-    --alpha-black-600: oklch(0.1689 0.1733 298.81 / 40%);
-    --alpha-black-700: oklch(0.1689 0.1733 298.81 / 50%);
-    --alpha-black-800: oklch(0.1689 0.1733 298.81 / 60%);
-    --alpha-black-900: oklch(0.1689 0.1733 298.81 / 70%);
-    --alpha-black-1000: oklch(0.1689 0.1733 298.81 / 80%);
-    --alpha-black-1100: oklch(0.1689 0.1733 298.81 / 90%);
-    --alpha-black-1200: oklch(0.1689 0.1733 298.81 / 95%);
+    --alpha-black-0: oklch(0.23 0.04 298.81 / 0%);
+    --alpha-black-100: oklch(0.23 0.04 298.81 / 5%);
+    --alpha-black-200: oklch(0.23 0.04 298.81 / 10%);
+    --alpha-black-300: oklch(0.23 0.04 298.81 / 15%);
+    --alpha-black-400: oklch(0.23 0.04 298.81 / 20%);
+    --alpha-black-500: oklch(0.23 0.04 298.81 / 30%);
+    --alpha-black-600: oklch(0.23 0.04 298.81 / 40%);
+    --alpha-black-700: oklch(0.23 0.04 298.81 / 50%);
+    --alpha-black-800: oklch(0.23 0.04 298.81 / 60%);
+    --alpha-black-900: oklch(0.23 0.04 298.81 / 70%);
+    --alpha-black-1000: oklch(0.23 0.04 298.81 / 80%);
+    --alpha-black-1100: oklch(0.23 0.04 298.81 / 90%);
+    --alpha-black-1200: oklch(0.23 0.04 298.81 / 95%);
     /* --------- Extended colors ---------- */
     /* Purple */
     --extended-color-purple-25: oklch(0.981 0.0054 297.73);
@@ -148,20 +148,20 @@
 
     /* -------------------- Light mode color tokens -------------------- */
     /* Neutral colors (Algios purple tint) */
-    --neutral-white: oklch(1 0.1733 298.81);
-    --neutral-100: oklch(0.9848 0.1733 298.81);
-    --neutral-200: oklch(0.9696 0.1733 298.81);
-    --neutral-300: oklch(0.9543 0.1733 298.81);
-    --neutral-400: oklch(0.9389 0.1733 298.81);
-    --neutral-500: oklch(0.9235 0.1733 298.81);
-    --neutral-600: oklch(0.8925 0.1733 298.81);
-    --neutral-700: oklch(0.8612 0.1733 298.81);
-    --neutral-800: oklch(0.6668 0.1733 298.81);
-    --neutral-900: oklch(0.6161 0.1733 298.81);
-    --neutral-1000: oklch(0.5288 0.1733 298.81);
-    --neutral-1100: oklch(0.4377 0.1733 298.81);
-    --neutral-1200: oklch(0.2378 0.1733 298.81);
-    --neutral-black: oklch(0.1472 0.1733 298.81);
+    --neutral-white: oklch(1 0.04 298.81);
+    --neutral-100: oklch(0.9848 0.04 298.81);
+    --neutral-200: oklch(0.9696 0.04 298.81);
+    --neutral-300: oklch(0.9543 0.04 298.81);
+    --neutral-400: oklch(0.9389 0.04 298.81);
+    --neutral-500: oklch(0.9235 0.04 298.81);
+    --neutral-600: oklch(0.8925 0.04 298.81);
+    --neutral-700: oklch(0.8612 0.04 298.81);
+    --neutral-800: oklch(0.6668 0.04 298.81);
+    --neutral-900: oklch(0.6161 0.04 298.81);
+    --neutral-1000: oklch(0.5288 0.04 298.81);
+    --neutral-1100: oklch(0.4377 0.04 298.81);
+    --neutral-1200: oklch(0.2378 0.04 298.81);
+    --neutral-black: oklch(0.1472 0.04 298.81);
     /* Brand colors (Algios orange) */
     --brand-100: oklch(0.9588 0.2036 36.33);
     --brand-200: oklch(0.8763 0.2036 36.33);
@@ -400,20 +400,20 @@
     /* ---------- Dark mode color tokens ---------- */
     @variant dark {
       /* Neutral colors (Algios purple tint) */
-      --neutral-black: oklch(0.1689 0.1733 298.81);
-      --neutral-100: oklch(0.1932 0.1733 298.81);
-      --neutral-200: oklch(0.2158 0.1733 298.81);
-      --neutral-300: oklch(0.2378 0.1733 298.81);
-      --neutral-400: oklch(0.2593 0.1733 298.81);
-      --neutral-500: oklch(0.3011 0.1733 298.81);
-      --neutral-600: oklch(0.3415 0.1733 298.81);
-      --neutral-700: oklch(0.3999 0.1733 298.81);
-      --neutral-800: oklch(0.5989 0.1733 298.81);
-      --neutral-900: oklch(0.6835 0.1733 298.81);
-      --neutral-1000: oklch(0.7655 0.1733 298.81);
-      --neutral-1100: oklch(0.8455 0.1733 298.81);
-      --neutral-1200: oklch(0.9235 0.1733 298.81);
-      --neutral-white: oklch(0.9702 0.1733 298.81);
+      --neutral-black: oklch(0.23 0.04 298.81);
+      --neutral-100: oklch(0.25 0.04 298.81);
+      --neutral-200: oklch(0.275 0.04 298.81);
+      --neutral-300: oklch(0.3 0.04 298.81);
+      --neutral-400: oklch(0.32 0.04 298.81);
+      --neutral-500: oklch(0.36 0.04 298.81);
+      --neutral-600: oklch(0.4 0.04 298.81);
+      --neutral-700: oklch(0.46 0.04 298.81);
+      --neutral-800: oklch(0.63 0.04 298.81);
+      --neutral-900: oklch(0.7 0.04 298.81);
+      --neutral-1000: oklch(0.78 0.04 298.81);
+      --neutral-1100: oklch(0.86 0.04 298.81);
+      --neutral-1200: oklch(0.93 0.04 298.81);
+      --neutral-white: oklch(0.97 0.04 298.81);
       /* Brand colors (Algios orange) */
       --brand-100: oklch(0.0629 0.2036 36.33);
       --brand-200: oklch(0.1258 0.2036 36.33);
@@ -694,7 +694,7 @@
 @theme {
   --color-*: initial;
   --color-white: oklch(1 0 0);
-  --color-black: oklch(0.1689 0.1733 298.81);
+  --color-black: oklch(0.23 0.04 298.81);
   /* ---------- Border radius ---------- */
   --radius-4xl: initial;
   /* ---------- Border width ---------- */
