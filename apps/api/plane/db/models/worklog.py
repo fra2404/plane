@@ -45,3 +45,41 @@ class IssueWorklog(ProjectBaseModel):
 
     def __str__(self):
         return f"{self.issue_id} {self.duration}s"
+
+
+class WorklogPayment(ProjectBaseModel):
+    """Tracks whether a member's logged hours for a given month/project were paid.
+
+    Granularity: (project, actor, month).
+    """
+
+    actor = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="worklog_payments",
+    )
+    month = models.CharField(max_length=7, verbose_name="Month (YYYY-MM)")
+    is_paid = models.BooleanField(default=False)
+    paid_at = models.DateField(null=True, blank=True)
+    amount = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    note = models.TextField(blank=True, default="")
+
+    class Meta:
+        verbose_name = "Worklog Payment"
+        verbose_name_plural = "Worklog Payments"
+        db_table = "worklog_payments"
+        ordering = ("-month", "project_id")
+        constraints = [
+            models.UniqueConstraint(
+                fields=["project", "actor", "month"],
+                condition=models.Q(deleted_at__isnull=True),
+                name="worklog_payment_unique_project_actor_month",
+            )
+        ]
+        indexes = [
+            models.Index(fields=["workspace", "month"], name="worklog_pay_ws_month_idx"),
+            models.Index(fields=["project", "actor", "month"], name="worklog_pay_proj_actor_idx"),
+        ]
+
+    def __str__(self):
+        return f"{self.project_id} {self.actor_id} {self.month} paid={self.is_paid}"

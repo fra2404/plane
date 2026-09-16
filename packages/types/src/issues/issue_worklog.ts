@@ -70,6 +70,33 @@ export type TWorkspaceWorklogMonthUserTotal = TWorkspaceWorklogMonthTotal & {
   actor_detail: IUserLite | null;
 };
 
+export type TWorkspaceWorklogMonthProjectUserTotal = TWorkspaceWorklogMonthUserTotal & {
+  project_id: string | null;
+  project_name: string;
+};
+
+export type TWorklogPayment = {
+  id: string;
+  project_id: string;
+  actor_id: string | null;
+  actor_detail: IUserLite | null;
+  month: string;
+  is_paid: boolean;
+  paid_at: string | null;
+  amount: string | null;
+  note: string;
+};
+
+export type TWorklogPaymentPayload = {
+  project: string;
+  actor: string;
+  month: string;
+  is_paid?: boolean;
+  paid_at?: string | null;
+  amount?: string | null;
+  note?: string;
+};
+
 export type TWorkspaceWorklogSummary = {
   group_by: string;
   total_logged_time: number;
@@ -77,6 +104,8 @@ export type TWorkspaceWorklogSummary = {
   user_totals: TWorkspaceWorklogUserTotal[];
   monthly_totals: TWorkspaceWorklogMonthTotal[];
   monthly_user_totals: TWorkspaceWorklogMonthUserTotal[];
+  monthly_project_user_totals?: TWorkspaceWorklogMonthProjectUserTotal[];
+  payments?: TWorklogPayment[];
   project_totals?: {
     project_id: string | null;
     project_name: string;

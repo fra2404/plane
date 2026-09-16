@@ -2,11 +2,13 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+import re
+
 from rest_framework import serializers
 
 from plane.app.serializers.base import BaseSerializer
 from plane.app.serializers.user import UserLiteSerializer
-from plane.db.models import IssueWorklog
+from plane.db.models import IssueWorklog, WorklogPayment
 from plane.utils.worklog import validate_worklog_duration
 
 
@@ -56,3 +58,36 @@ class IssueWorklogSerializer(BaseSerializer):
             return validate_worklog_duration(value)
         except ValueError as exc:
             raise serializers.ValidationError(str(exc)) from exc
+
+
+class WorklogPaymentSerializer(BaseSerializer):
+    actor_detail = UserLiteSerializer(read_only=True, source="actor")
+
+    class Meta:
+        model = WorklogPayment
+        fields = [
+            "id",
+            "workspace",
+            "project",
+            "actor",
+            "actor_detail",
+            "month",
+            "is_paid",
+            "paid_at",
+            "amount",
+            "note",
+            "created_at",
+            "updated_at",
+            "created_by",
+            "updated_by",
+        ]
+        read_only_fields = ["id", "workspace", "created_at", "updated_at", "created_by", "updated_by"]
+
+    def validate_month(self, value):
+        value = (value or "").strip()
+        if not re.match(r"^\d{4}-\d{2}$", value):
+            raise serializers.ValidationError("Month must be in YYYY-MM format.")
+        return value
+
+    def validate_note(self, value):
+        return value or ""

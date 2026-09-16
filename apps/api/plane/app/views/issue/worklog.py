@@ -13,11 +13,20 @@ from rest_framework import status
 from rest_framework.response import Response
 
 from plane.app.permissions import ROLE, WorkspaceEntityPermission, allow_permission
-from plane.app.serializers import IssueWorklogSerializer
+from plane.app.serializers import IssueWorklogSerializer, WorklogPaymentSerializer
 from plane.app.serializers.user import UserLiteSerializer
 from plane.app.views.base import BaseAPIView
 from plane.bgtasks.issue_activities_task import issue_activity
-from plane.db.models import Issue, IssueWorklog, Project, ProjectMember, User, WorkspaceMember
+from plane.db.models import (
+    Issue,
+    IssueWorklog,
+    Project,
+    ProjectMember,
+    User,
+    Workspace,
+    WorkspaceMember,
+    WorklogPayment,
+)
 from plane.utils.host import base_host
 
 from .. import BaseViewSet
@@ -335,6 +344,13 @@ class WorkspaceWorklogSummaryEndpoint(BaseAPIView):
             .order_by("-month", "-duration")
         )
 
+        monthly_project_user_rows = list(
+            worklogs.annotate(month=TruncMonth("logged_at"))
+            .values("month", "project_id", "project__name", "actor_id")
+            .annotate(duration=Sum("duration"), worklog_count=Count("id"))
+            .order_by("-month", "project__name")
+        )
+
         project_rows = list(
             worklogs.values("project_id", "project__name", "project__budget_hours", "project__budget_months")
             .annotate(duration=Sum("duration"), worklog_count=Count("id"))
@@ -392,6 +408,47 @@ class WorkspaceWorklogSummaryEndpoint(BaseAPIView):
             if row["month"]
         ]
 
+        monthly_project_user_totals = [
+            {
+                "month": row["month"].strftime("%Y-%m"),
+                "project_id": str(row["project_id"]) if row["project_id"] else None,
+                "project_name": row["project__name"],
+                "actor_id": str(row["actor_id"]) if row["actor_id"] else None,
+                "actor_detail": actors.get(row["actor_id"]),
+                "duration": row["duration"] or 0,
+                "worklog_count": row["worklog_count"],
+            }
+            for row in monthly_project_user_rows
+            if row["month"]
+        ]
+
+        payments_qs = WorklogPayment.objects.filter(workspace__slug=slug, deleted_at__isnull=True).select_related(
+            "actor"
+        )
+        if project_id:
+            payments_qs = payments_qs.filter(project_id=project_id)
+        if actor_id:
+            payments_qs = payments_qs.filter(actor_id=actor_id)
+        if date_from:
+            payments_qs = payments_qs.filter(month__gte=date_from.strftime("%Y-%m"))
+        if date_to:
+            payments_qs = payments_qs.filter(month__lte=date_to.strftime("%Y-%m"))
+
+        payments = [
+            {
+                "id": str(payment.id),
+                "project_id": str(payment.project_id),
+                "actor_id": str(payment.actor_id) if payment.actor_id else None,
+                "actor_detail": actors.get(payment.actor_id) or UserLiteSerializer(payment.actor).data,
+                "month": payment.month,
+                "is_paid": payment.is_paid,
+                "paid_at": payment.paid_at.isoformat() if payment.paid_at else None,
+                "amount": str(payment.amount) if payment.amount is not None else None,
+                "note": payment.note,
+            }
+            for payment in payments_qs
+        ]
+
         total_logged_time = sum(row["duration"] for row in results)
 
         project_totals = [
@@ -414,7 +471,81 @@ class WorkspaceWorklogSummaryEndpoint(BaseAPIView):
                 "user_totals": user_totals,
                 "monthly_totals": monthly_totals,
                 "monthly_user_totals": monthly_user_totals,
+                "monthly_project_user_totals": monthly_project_user_totals,
+                "payments": payments,
                 "project_totals": project_totals,
             },
             status=status.HTTP_200_OK,
         )
+
+
+class WorklogPaymentViewSet(BaseViewSet):
+    """Admin-only CRUD for marking logged hours as paid (per project + actor + month)."""
+
+    model = WorklogPayment
+    serializer_class = WorklogPaymentSerializer
+
+    def get_queryset(self):
+        return WorklogPayment.objects.filter(workspace__slug=self.kwargs.get("slug")).select_related("actor")
+
+    @allow_permission([ROLE.ADMIN], level="WORKSPACE")
+    def list(self, request, slug):
+        queryset = self.get_queryset()
+        project_id = request.GET.get("project_id")
+        actor_id = request.GET.get("actor_id")
+        month = request.GET.get("month")
+        if project_id:
+            queryset = queryset.filter(project_id=project_id)
+        if actor_id:
+            queryset = queryset.filter(actor_id=actor_id)
+        if month:
+            queryset = queryset.filter(month=month)
+        return Response(WorklogPaymentSerializer(queryset, many=True).data)
+
+    @allow_permission([ROLE.ADMIN], level="WORKSPACE")
+    def create(self, request, slug):
+        workspace = Workspace.objects.get(slug=slug)
+        project = Project.objects.filter(
+            id=request.data.get("project"), workspace=workspace, archived_at__isnull=True
+        ).first()
+        actor = User.objects.filter(id=request.data.get("actor")).first()
+        month = (request.data.get("month") or "").strip()
+        if not project or not actor or not month:
+            return Response(
+                {"error": "project, actor and month are required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        existing = WorklogPayment.objects.filter(
+            project=project, actor=actor, month=month, deleted_at__isnull=True
+        ).first()
+        serializer = WorklogPaymentSerializer(
+            existing,
+            data=request.data,
+            partial=True,
+        )
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        if existing:
+            serializer.save(updated_by=request.user)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        serializer.save(workspace=workspace, project=project, actor=actor, month=month, created_by=request.user)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+    @allow_permission([ROLE.ADMIN], level="WORKSPACE")
+    def partial_update(self, request, slug, pk):
+        payment = self.get_queryset().filter(pk=pk).first()
+        if not payment:
+            return Response({"error": "Not found."}, status=status.HTTP_404_NOT_FOUND)
+        serializer = WorklogPaymentSerializer(payment, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save(updated_by=request.user)
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    @allow_permission([ROLE.ADMIN], level="WORKSPACE")
+    def destroy(self, request, slug, pk):
+        payment = self.get_queryset().filter(pk=pk).first()
+        if not payment:
+            return Response({"error": "Not found."}, status=status.HTTP_404_NOT_FOUND)
+        payment.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)

@@ -21,6 +21,8 @@ import type {
   TIssueWorklogListResponse,
   TWorkspaceWorklogSummary,
   TWorkspaceWorklogSummaryParams,
+  TWorklogPayment,
+  TWorklogPaymentPayload,
 } from "@plane/types";
 // services
 import { APIService } from "@/services/api.service";
@@ -526,6 +528,22 @@ export class IssueService extends APIService {
     params?: TWorkspaceWorklogSummaryParams
   ): Promise<TWorkspaceWorklogSummary> {
     return this.get(`/api/workspaces/${workspaceSlug}/worklog-summary/`, { params })
+      .then((response) => response?.data)
+      .catch((error) => {
+        throw error?.response;
+      });
+  }
+
+  async upsertWorkspaceWorklogPayment(workspaceSlug: string, data: TWorklogPaymentPayload): Promise<TWorklogPayment> {
+    return this.post(`/api/workspaces/${workspaceSlug}/worklog-payments/`, data)
+      .then((response) => response?.data)
+      .catch((error) => {
+        throw error?.response;
+      });
+  }
+
+  async deleteWorkspaceWorklogPayment(workspaceSlug: string, paymentId: string): Promise<void> {
+    return this.delete(`/api/workspaces/${workspaceSlug}/worklog-payments/${paymentId}/`)
       .then((response) => response?.data)
       .catch((error) => {
         throw error?.response;

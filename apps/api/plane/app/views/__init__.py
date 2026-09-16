@@ -140,7 +140,7 @@ from .issue.attachment import (
 
 from .issue.comment import IssueCommentViewSet, CommentReactionViewSet
 
-from .issue.worklog import IssueWorklogViewSet, WorkspaceWorklogSummaryEndpoint
+from .issue.worklog import IssueWorklogViewSet, WorkspaceWorklogSummaryEndpoint, WorklogPaymentViewSet
 from .intranet import (
     IntranetClientViewSet,
     IntranetContactViewSet,

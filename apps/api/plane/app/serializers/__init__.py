@@ -126,7 +126,7 @@ from .notification import NotificationSerializer, UserNotificationPreferenceSeri
 
 from .exporter import ExporterHistorySerializer
 
-from .worklog import IssueWorklogSerializer
+from .worklog import IssueWorklogSerializer, WorklogPaymentSerializer
 
 from .intranet import (
     IntranetClientSerializer,
