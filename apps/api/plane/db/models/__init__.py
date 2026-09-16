@@ -67,6 +67,7 @@ from .view import IssueView
 from .webhook import Webhook, WebhookLog
 from .worklog import IssueWorklog, WorklogPayment
 from .intranet import IntranetClient, IntranetContact, IntranetDevice, IntranetLink, IntranetNews
+from .team import WorkspaceTeamMember
 from .workspace import (
     Workspace,
     WorkspaceBaseModel,

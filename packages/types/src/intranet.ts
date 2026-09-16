@@ -86,3 +86,40 @@ export type TAnniversaryEvent = {
   days_until: number;
   years: number | null;
 };
+
+export type TTeamMemberProfile = {
+  id: string;
+  workspace: string;
+  user: string;
+  role: string;
+  department: string;
+  manager: string | null;
+  manager_detail: IUserLite | null;
+  phone: string;
+  discord_id: string;
+  location: string;
+  hire_date: string | null;
+  linkedin: string;
+  notes: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type TTeamMember = {
+  user_id: string;
+  user_detail: IUserLite;
+  workspace_role: number;
+  team: TTeamMemberProfile | null;
+};
+
+export type TTeamMemberPayload = {
+  role?: string;
+  department?: string;
+  manager?: string | null;
+  phone?: string;
+  discord_id?: string;
+  location?: string;
+  hire_date?: string | null;
+  linkedin?: string;
+  notes?: string;
+};

@@ -150,6 +150,7 @@ from .intranet import (
     ProjectUsefulLinkViewSet,
 )
 from .anniversary import WorkspaceAnniversaryEndpoint
+from .team import WorkspaceTeamViewSet
 
 from .issue.label import LabelViewSet, BulkCreateIssueLabelsEndpoint
 
