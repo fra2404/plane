@@ -43,7 +43,14 @@ const hours = (seconds: number) => (seconds / 3600).toFixed(1);
 
 const paymentKey = (month: string, projectId: string, actorId: string) => `${month}|${projectId}|${actorId}`;
 
-type TPaymentDraft = { is_paid?: boolean; paid_at?: string; amount?: string; note?: string };
+type TPaymentDraft = { paid_at?: string; hours?: string; amount?: string; note?: string };
+
+const hoursToInput = (seconds: number) => {
+  const value = Number((seconds / 3600).toFixed(2));
+  return value ? String(value) : "";
+};
+
+const inputToSeconds = (value: string | undefined) => Math.round((Number(value) || 0) * 3600);
 
 const WorkspaceWorklogsSettingsPage = observer(function WorkspaceWorklogsSettingsPage() {
   const { workspaceSlug } = useParams();
@@ -59,7 +66,8 @@ const WorkspaceWorklogsSettingsPage = observer(function WorkspaceWorklogsSetting
   const [selectedMonth, setSelectedMonth] = useState<string>("all");
   const [budgetDraft, setBudgetDraft] = useState<Record<string, { general?: string; month?: string }>>({});
   const [savingBudget, setSavingBudget] = useState<string | null>(null);
-  const [paymentDraft, setPaymentDraft] = useState<Record<string, TPaymentDraft>>({});
+  const [paymentEditDraft, setPaymentEditDraft] = useState<Record<string, TPaymentDraft>>({});
+  const [paymentNewDraft, setPaymentNewDraft] = useState<Record<string, TPaymentDraft>>({});
   const [savingPayment, setSavingPayment] = useState<string | null>(null);
 
   const canAdmin = allowPermissions([EUserPermissions.ADMIN], EUserPermissionsLevel.WORKSPACE);
@@ -126,29 +134,78 @@ const WorkspaceWorklogsSettingsPage = observer(function WorkspaceWorklogsSetting
     }
   };
 
-  const savePayment = async (row: TWorkspaceWorklogMonthProjectUserTotal) => {
-    if (!workspaceSlug || !row.project_id || !row.actor_id) return;
-    const key = paymentKey(row.month, row.project_id, row.actor_id);
-    const draft = paymentDraft[key] ?? {};
-    setSavingPayment(key);
+  const startNewPayment = (group: { key: string; residual: number }) => {
+    const today = new Date().toISOString().slice(0, 10);
+    setPaymentNewDraft((prev) => ({
+      ...prev,
+      [group.key]: { paid_at: today, hours: hoursToInput(group.residual), amount: "", note: "" },
+    }));
+  };
+
+  const cancelNewPayment = (key: string) =>
+    setPaymentNewDraft((prev) => {
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
+
+  const saveNewPayment = async (group: { key: string; row: TWorkspaceWorklogMonthProjectUserTotal }) => {
+    if (!workspaceSlug || !group.row.project_id || !group.row.actor_id) return;
+    const draft = paymentNewDraft[group.key];
+    if (!draft) return;
+    setSavingPayment(group.key);
     try {
-      await issueService.upsertWorkspaceWorklogPayment(workspaceSlug, {
-        project: row.project_id,
-        actor: row.actor_id,
-        month: row.month,
-        is_paid: draft.is_paid ?? false,
+      await issueService.createWorkspaceWorklogPayment(workspaceSlug, {
+        project: group.row.project_id,
+        actor: group.row.actor_id,
+        month: group.row.month,
+        duration: inputToSeconds(draft.hours),
         paid_at: draft.paid_at ? draft.paid_at : null,
         amount: draft.amount === undefined || draft.amount === "" ? null : draft.amount,
         note: draft.note ?? "",
       });
-      setPaymentDraft((prev) => {
+      cancelNewPayment(group.key);
+      await fetchSummary();
+    } catch {
+      // keep the draft so the value is not lost
+    } finally {
+      setSavingPayment(null);
+    }
+  };
+
+  const savePaymentEdit = async (payment: TWorklogPayment) => {
+    if (!workspaceSlug) return;
+    const draft = paymentEditDraft[payment.id];
+    if (!draft) return;
+    setSavingPayment(payment.id);
+    try {
+      await issueService.updateWorkspaceWorklogPayment(workspaceSlug, payment.id, {
+        duration: inputToSeconds(draft.hours),
+        paid_at: draft.paid_at ? draft.paid_at : null,
+        amount: draft.amount === undefined || draft.amount === "" ? null : draft.amount,
+        note: draft.note ?? "",
+      });
+      setPaymentEditDraft((prev) => {
         const next = { ...prev };
-        delete next[key];
+        delete next[payment.id];
         return next;
       });
       await fetchSummary();
     } catch {
       // keep the draft so the value is not lost
+    } finally {
+      setSavingPayment(null);
+    }
+  };
+
+  const deletePayment = async (payment: TWorklogPayment) => {
+    if (!workspaceSlug) return;
+    setSavingPayment(payment.id);
+    try {
+      await issueService.deleteWorkspaceWorklogPayment(workspaceSlug, payment.id);
+      await fetchSummary();
+    } catch {
+      // ignore
     } finally {
       setSavingPayment(null);
     }
@@ -204,16 +261,28 @@ const WorkspaceWorklogsSettingsPage = observer(function WorkspaceWorklogsSetting
   const userTotals = summary?.user_totals ?? [];
   const rows = summary?.results ?? [];
   const months = overview?.monthly_totals ?? summary?.monthly_totals ?? [];
-  const paymentRows = summary?.monthly_project_user_totals ?? [];
-  const paymentsIndex = useMemo(() => {
-    const map = new Map<string, TWorklogPayment>();
+  const paymentGroups = useMemo(() => {
+    const projectUserRows = summary?.monthly_project_user_totals ?? [];
+    const byKey = new Map<string, TWorklogPayment[]>();
     (summary?.payments ?? []).forEach((payment) => {
-      if (payment.project_id && payment.actor_id) {
-        map.set(paymentKey(payment.month, payment.project_id, payment.actor_id), payment);
-      }
+      if (!payment.project_id || !payment.actor_id) return;
+      const key = paymentKey(payment.month, payment.project_id, payment.actor_id);
+      const list = byKey.get(key) ?? [];
+      list.push(payment);
+      byKey.set(key, list);
     });
-    return map;
-  }, [summary?.payments]);
+    return projectUserRows
+      .filter((row) => row.project_id && row.actor_id)
+      .map((row) => {
+        const key = paymentKey(row.month, row.project_id ?? "", row.actor_id ?? "");
+        const payments = (byKey.get(key) ?? [])
+          .slice()
+          // oxlint-disable-next-line unicorn/no-array-sort
+          .sort((a, b) => (a.paid_at ?? "").localeCompare(b.paid_at ?? ""));
+        const paidDuration = row.paid_duration ?? 0;
+        return { key, row, payments, paidDuration, residual: Math.max(0, row.duration - paidDuration) };
+      });
+  }, [summary?.monthly_project_user_totals, summary?.payments]);
 
   return (
     <SettingsContentWrapper header={<WorklogsWorkspaceSettingsHeader />} hugging>
@@ -289,128 +358,246 @@ const WorkspaceWorklogsSettingsPage = observer(function WorkspaceWorklogsSetting
 
             <div>
               <h5 className="pb-2 text-body-sm-medium text-secondary">Ore pagate</h5>
-              <p className="pb-2 text-body-xs-regular text-tertiary">
-                Segna come pagate le ore di un membro per progetto e mese. Ogni riga si salva singolarmente.
+              <p className="pb-3 text-body-xs-regular text-tertiary">
+                Storico pagamenti per membro, progetto e mese. Puoi aggiungere più pagamenti nello stesso mese (es.
+                acconto a metà mese e saldo a fine mese): il residuo &quot;da pagare&quot; si calcola automaticamente.
                 {selectedMonth !== "all" && ` Mese selezionato: ${formatMonth(selectedMonth)}.`}
               </p>
-              {paymentRows.length === 0 ? (
+              {paymentGroups.length === 0 ? (
                 <p className="py-2 text-body-sm-regular text-tertiary">{t("activity_empty_state.no_worklogs")}</p>
               ) : (
-                <div className="overflow-hidden rounded-md border border-subtle">
-                  <table className="w-full table-auto text-left text-body-sm-regular">
-                    <thead className="bg-surface-2 text-tertiary">
-                      <tr>
-                        <th className="px-3 py-2 font-medium">Mese</th>
-                        <th className="px-3 py-2 font-medium">Progetto</th>
-                        <th className="px-3 py-2 font-medium">Membro</th>
-                        <th className="px-3 py-2 text-right font-medium">Ore</th>
-                        <th className="px-3 py-2 font-medium">Pagato</th>
-                        <th className="px-3 py-2 font-medium">Data</th>
-                        <th className="px-3 py-2 font-medium">Importo €</th>
-                        <th className="px-3 py-2 font-medium">Nota</th>
-                        <th className="px-3 py-2" />
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {paymentRows.map((row) => {
-                        if (!row.project_id || !row.actor_id) return null;
-                        const key = paymentKey(row.month, row.project_id, row.actor_id);
-                        const existing = paymentsIndex.get(key);
-                        const draft = paymentDraft[key] ?? {};
-                        const isPaid = draft.is_paid ?? existing?.is_paid ?? false;
-                        const paidAt = draft.paid_at ?? existing?.paid_at ?? "";
-                        const amount = draft.amount ?? existing?.amount ?? "";
-                        const note = draft.note ?? existing?.note ?? "";
-                        const dirty = Object.keys(draft).length > 0;
-                        return (
-                          <tr key={key} className="border-t border-subtle">
-                            <td className="px-3 py-2 text-secondary">{formatMonth(row.month)}</td>
-                            <td className="px-3 py-2 text-secondary">{row.project_name}</td>
-                            <td className="px-3 py-2 text-primary">
-                              {row.actor_detail?.display_name ?? t("unknown_user")}
-                            </td>
-                            <td className="px-3 py-2 text-right text-secondary">{hours(row.duration)}</td>
-                            <td className="px-3 py-2">
-                              <label className="flex items-center gap-2">
-                                <input
-                                  type="checkbox"
-                                  checked={isPaid}
-                                  onChange={(event) => {
-                                    const checked = event.target.checked;
-                                    const today = new Date().toISOString().slice(0, 10);
-                                    setPaymentDraft((prev) => ({
-                                      ...prev,
-                                      [key]: {
-                                        ...prev[key],
-                                        is_paid: checked,
-                                        paid_at: checked && !paidAt ? today : paidAt,
-                                      },
-                                    }));
-                                  }}
-                                />
-                                {isPaid && <span className="text-11 text-success-primary">Pagato</span>}
-                              </label>
-                            </td>
-                            <td className="px-3 py-2">
-                              <input
-                                type="date"
-                                value={paidAt}
-                                onChange={(event) =>
-                                  setPaymentDraft((prev) => ({
-                                    ...prev,
-                                    [key]: { ...prev[key], paid_at: event.target.value },
-                                  }))
-                                }
-                                className="rounded border border-subtle bg-surface-1 px-2 py-1 text-body-sm-regular text-primary outline-none"
-                              />
-                            </td>
-                            <td className="px-3 py-2">
-                              <input
-                                type="number"
-                                step="0.01"
-                                min="0"
-                                placeholder="—"
-                                value={amount}
-                                onChange={(event) =>
-                                  setPaymentDraft((prev) => ({
-                                    ...prev,
-                                    [key]: { ...prev[key], amount: event.target.value },
-                                  }))
-                                }
-                                className="w-24 rounded border border-subtle bg-surface-1 px-2 py-1 text-right text-body-sm-regular text-primary outline-none"
-                              />
-                            </td>
-                            <td className="px-3 py-2">
-                              <input
-                                type="text"
-                                placeholder="—"
-                                value={note}
-                                onChange={(event) =>
-                                  setPaymentDraft((prev) => ({
-                                    ...prev,
-                                    [key]: { ...prev[key], note: event.target.value },
-                                  }))
-                                }
-                                className="w-40 rounded border border-subtle bg-surface-1 px-2 py-1 text-body-sm-regular text-primary outline-none"
-                              />
-                            </td>
-                            <td className="px-3 py-2 text-right">
-                              {dirty && (
-                                <button
-                                  type="button"
-                                  disabled={savingPayment === key}
-                                  onClick={() => void savePayment(row)}
-                                  className="rounded bg-accent-primary px-2 py-1 text-11 text-white disabled:opacity-50"
-                                >
-                                  Salva
-                                </button>
+                <div className="space-y-3">
+                  {paymentGroups.map((group) => {
+                    const newDraft = paymentNewDraft[group.key];
+                    return (
+                      <div key={group.key} className="rounded-md border border-subtle p-3">
+                        <div className="flex flex-wrap items-center justify-between gap-2 pb-2">
+                          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-body-sm-regular">
+                            <span className="font-medium text-primary">
+                              {group.row.actor_detail?.display_name ?? t("unknown_user")}
+                            </span>
+                            <span className="text-tertiary">{group.row.project_name}</span>
+                            <span className="text-tertiary">{formatMonth(group.row.month)}</span>
+                          </div>
+                          <div className="flex flex-wrap items-center gap-4 text-body-sm-regular">
+                            <span className="text-tertiary">
+                              Ore: <span className="text-primary">{hours(group.row.duration)}</span>
+                            </span>
+                            <span className="text-tertiary">
+                              Pagate: <span className="text-primary">{hours(group.paidDuration)}</span>
+                            </span>
+                            <span className={group.residual > 1 ? "font-medium text-danger-primary" : "text-tertiary"}>
+                              Da pagare: {hours(group.residual)}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => startNewPayment(group)}
+                              className="rounded bg-accent-primary px-2 py-1 text-11 text-white"
+                            >
+                              + Pagamento
+                            </button>
+                          </div>
+                        </div>
+                        <div className="overflow-hidden rounded border border-subtle">
+                          <table className="w-full table-auto text-left text-body-sm-regular">
+                            <thead className="bg-surface-2 text-tertiary">
+                              <tr>
+                                <th className="px-3 py-1.5 font-medium">Data</th>
+                                <th className="px-3 py-1.5 font-medium">Ore</th>
+                                <th className="px-3 py-1.5 font-medium">Importo €</th>
+                                <th className="px-3 py-1.5 font-medium">Nota</th>
+                                <th className="px-3 py-1.5" />
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {group.payments.map((payment) => {
+                                const draft = paymentEditDraft[payment.id] ?? {};
+                                const paidAt = draft.paid_at ?? payment.paid_at ?? "";
+                                const hoursValue = draft.hours ?? hoursToInput(payment.duration);
+                                const amountValue = draft.amount ?? payment.amount ?? "";
+                                const noteValue = draft.note ?? payment.note ?? "";
+                                const dirty = Object.keys(draft).length > 0;
+                                return (
+                                  <tr key={payment.id} className="border-t border-subtle">
+                                    <td className="px-3 py-1.5">
+                                      <input
+                                        type="date"
+                                        value={paidAt}
+                                        onChange={(event) =>
+                                          setPaymentEditDraft((prev) => ({
+                                            ...prev,
+                                            [payment.id]: { ...prev[payment.id], paid_at: event.target.value },
+                                          }))
+                                        }
+                                        className="rounded border border-subtle bg-surface-1 px-2 py-1 text-body-sm-regular text-primary outline-none"
+                                      />
+                                    </td>
+                                    <td className="px-3 py-1.5">
+                                      <input
+                                        type="number"
+                                        step="0.25"
+                                        min="0"
+                                        value={hoursValue}
+                                        onChange={(event) =>
+                                          setPaymentEditDraft((prev) => ({
+                                            ...prev,
+                                            [payment.id]: { ...prev[payment.id], hours: event.target.value },
+                                          }))
+                                        }
+                                        className="w-20 rounded border border-subtle bg-surface-1 px-2 py-1 text-right text-body-sm-regular text-primary outline-none"
+                                      />
+                                    </td>
+                                    <td className="px-3 py-1.5">
+                                      <input
+                                        type="number"
+                                        step="0.01"
+                                        min="0"
+                                        placeholder="—"
+                                        value={amountValue}
+                                        onChange={(event) =>
+                                          setPaymentEditDraft((prev) => ({
+                                            ...prev,
+                                            [payment.id]: { ...prev[payment.id], amount: event.target.value },
+                                          }))
+                                        }
+                                        className="w-24 rounded border border-subtle bg-surface-1 px-2 py-1 text-right text-body-sm-regular text-primary outline-none"
+                                      />
+                                    </td>
+                                    <td className="px-3 py-1.5">
+                                      <input
+                                        type="text"
+                                        placeholder="—"
+                                        value={noteValue}
+                                        onChange={(event) =>
+                                          setPaymentEditDraft((prev) => ({
+                                            ...prev,
+                                            [payment.id]: { ...prev[payment.id], note: event.target.value },
+                                          }))
+                                        }
+                                        className="w-full rounded border border-subtle bg-surface-1 px-2 py-1 text-body-sm-regular text-primary outline-none"
+                                      />
+                                    </td>
+                                    <td className="px-3 py-1.5 text-right">
+                                      <div className="flex items-center justify-end gap-2">
+                                        {dirty && (
+                                          <button
+                                            type="button"
+                                            disabled={savingPayment === payment.id}
+                                            onClick={() => void savePaymentEdit(payment)}
+                                            className="rounded bg-accent-primary px-2 py-1 text-11 text-white disabled:opacity-50"
+                                          >
+                                            Salva
+                                          </button>
+                                        )}
+                                        <button
+                                          type="button"
+                                          disabled={savingPayment === payment.id}
+                                          onClick={() => void deletePayment(payment)}
+                                          className="rounded border border-subtle px-2 py-1 text-11 text-danger-primary disabled:opacity-50"
+                                        >
+                                          Elimina
+                                        </button>
+                                      </div>
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+
+                              {newDraft && (
+                                <tr className="border-t border-subtle bg-surface-2">
+                                  <td className="px-3 py-1.5">
+                                    <input
+                                      type="date"
+                                      value={newDraft.paid_at ?? ""}
+                                      onChange={(event) =>
+                                        setPaymentNewDraft((prev) => ({
+                                          ...prev,
+                                          [group.key]: { ...prev[group.key], paid_at: event.target.value },
+                                        }))
+                                      }
+                                      className="rounded border border-subtle bg-surface-1 px-2 py-1 text-body-sm-regular text-primary outline-none"
+                                    />
+                                  </td>
+                                  <td className="px-3 py-1.5">
+                                    <input
+                                      type="number"
+                                      step="0.25"
+                                      min="0"
+                                      value={newDraft.hours ?? ""}
+                                      onChange={(event) =>
+                                        setPaymentNewDraft((prev) => ({
+                                          ...prev,
+                                          [group.key]: { ...prev[group.key], hours: event.target.value },
+                                        }))
+                                      }
+                                      className="w-20 rounded border border-subtle bg-surface-1 px-2 py-1 text-right text-body-sm-regular text-primary outline-none"
+                                    />
+                                  </td>
+                                  <td className="px-3 py-1.5">
+                                    <input
+                                      type="number"
+                                      step="0.01"
+                                      min="0"
+                                      placeholder="—"
+                                      value={newDraft.amount ?? ""}
+                                      onChange={(event) =>
+                                        setPaymentNewDraft((prev) => ({
+                                          ...prev,
+                                          [group.key]: { ...prev[group.key], amount: event.target.value },
+                                        }))
+                                      }
+                                      className="w-24 rounded border border-subtle bg-surface-1 px-2 py-1 text-right text-body-sm-regular text-primary outline-none"
+                                    />
+                                  </td>
+                                  <td className="px-3 py-1.5">
+                                    <input
+                                      type="text"
+                                      placeholder="Nota"
+                                      value={newDraft.note ?? ""}
+                                      onChange={(event) =>
+                                        setPaymentNewDraft((prev) => ({
+                                          ...prev,
+                                          [group.key]: { ...prev[group.key], note: event.target.value },
+                                        }))
+                                      }
+                                      className="w-full rounded border border-subtle bg-surface-1 px-2 py-1 text-body-sm-regular text-primary outline-none"
+                                    />
+                                  </td>
+                                  <td className="px-3 py-1.5 text-right">
+                                    <div className="flex items-center justify-end gap-2">
+                                      <button
+                                        type="button"
+                                        disabled={savingPayment === group.key}
+                                        onClick={() => void saveNewPayment(group)}
+                                        className="rounded bg-accent-primary px-2 py-1 text-11 text-white disabled:opacity-50"
+                                      >
+                                        Salva
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => cancelNewPayment(group.key)}
+                                        className="rounded border border-subtle px-2 py-1 text-11 text-secondary"
+                                      >
+                                        Annulla
+                                      </button>
+                                    </div>
+                                  </td>
+                                </tr>
                               )}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
+
+                              {group.payments.length === 0 && !newDraft && (
+                                <tr className="border-t border-subtle">
+                                  <td colSpan={5} className="px-3 py-2 text-tertiary">
+                                    Nessun pagamento registrato.
+                                  </td>
+                                </tr>
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>

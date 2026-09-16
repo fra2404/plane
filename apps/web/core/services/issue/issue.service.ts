@@ -534,8 +534,20 @@ export class IssueService extends APIService {
       });
   }
 
-  async upsertWorkspaceWorklogPayment(workspaceSlug: string, data: TWorklogPaymentPayload): Promise<TWorklogPayment> {
+  async createWorkspaceWorklogPayment(workspaceSlug: string, data: TWorklogPaymentPayload): Promise<TWorklogPayment> {
     return this.post(`/api/workspaces/${workspaceSlug}/worklog-payments/`, data)
+      .then((response) => response?.data)
+      .catch((error) => {
+        throw error?.response;
+      });
+  }
+
+  async updateWorkspaceWorklogPayment(
+    workspaceSlug: string,
+    paymentId: string,
+    data: Partial<TWorklogPaymentPayload>
+  ): Promise<TWorklogPayment> {
+    return this.patch(`/api/workspaces/${workspaceSlug}/worklog-payments/${paymentId}/`, data)
       .then((response) => response?.data)
       .catch((error) => {
         throw error?.response;

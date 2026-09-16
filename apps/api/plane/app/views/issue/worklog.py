@@ -3,6 +3,7 @@
 # See the LICENSE file for details.
 
 import json
+from decimal import Decimal
 
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db.models import Count, Exists, Sum
@@ -408,20 +409,6 @@ class WorkspaceWorklogSummaryEndpoint(BaseAPIView):
             if row["month"]
         ]
 
-        monthly_project_user_totals = [
-            {
-                "month": row["month"].strftime("%Y-%m"),
-                "project_id": str(row["project_id"]) if row["project_id"] else None,
-                "project_name": row["project__name"],
-                "actor_id": str(row["actor_id"]) if row["actor_id"] else None,
-                "actor_detail": actors.get(row["actor_id"]),
-                "duration": row["duration"] or 0,
-                "worklog_count": row["worklog_count"],
-            }
-            for row in monthly_project_user_rows
-            if row["month"]
-        ]
-
         payments_qs = WorklogPayment.objects.filter(workspace__slug=slug, deleted_at__isnull=True).select_related(
             "actor"
         )
@@ -434,6 +421,14 @@ class WorkspaceWorklogSummaryEndpoint(BaseAPIView):
         if date_to:
             payments_qs = payments_qs.filter(month__lte=date_to.strftime("%Y-%m"))
 
+        paid_by_key: dict = {}
+        for payment in payments_qs:
+            key = (str(payment.project_id), str(payment.actor_id), payment.month)
+            bucket = paid_by_key.setdefault(key, {"duration": 0, "amount": Decimal("0")})
+            bucket["duration"] += payment.duration or 0
+            if payment.amount is not None:
+                bucket["amount"] += payment.amount
+
         payments = [
             {
                 "id": str(payment.id),
@@ -441,13 +436,35 @@ class WorkspaceWorklogSummaryEndpoint(BaseAPIView):
                 "actor_id": str(payment.actor_id) if payment.actor_id else None,
                 "actor_detail": actors.get(payment.actor_id) or UserLiteSerializer(payment.actor).data,
                 "month": payment.month,
-                "is_paid": payment.is_paid,
+                "duration": payment.duration or 0,
                 "paid_at": payment.paid_at.isoformat() if payment.paid_at else None,
                 "amount": str(payment.amount) if payment.amount is not None else None,
                 "note": payment.note,
             }
             for payment in payments_qs
         ]
+
+        monthly_project_user_totals = []
+        for row in monthly_project_user_rows:
+            if not row["month"]:
+                continue
+            month = row["month"].strftime("%Y-%m")
+            project_key = str(row["project_id"]) if row["project_id"] else None
+            actor_key = str(row["actor_id"]) if row["actor_id"] else None
+            paid = paid_by_key.get((project_key or "", actor_key or "", month))
+            monthly_project_user_totals.append(
+                {
+                    "month": month,
+                    "project_id": project_key,
+                    "project_name": row["project__name"],
+                    "actor_id": actor_key,
+                    "actor_detail": actors.get(row["actor_id"]),
+                    "duration": row["duration"] or 0,
+                    "worklog_count": row["worklog_count"],
+                    "paid_duration": paid["duration"] if paid else 0,
+                    "paid_amount": str(paid["amount"]) if paid else "0",
+                }
+            )
 
         total_logged_time = sum(row["duration"] for row in results)
 
@@ -515,19 +532,9 @@ class WorklogPaymentViewSet(BaseViewSet):
                 {"error": "project, actor and month are required."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        existing = WorklogPayment.objects.filter(
-            project=project, actor=actor, month=month, deleted_at__isnull=True
-        ).first()
-        serializer = WorklogPaymentSerializer(
-            existing,
-            data=request.data,
-            partial=True,
-        )
+        serializer = WorklogPaymentSerializer(data=request.data)
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        if existing:
-            serializer.save(updated_by=request.user)
-            return Response(serializer.data, status=status.HTTP_200_OK)
         serializer.save(workspace=workspace, project=project, actor=actor, month=month, created_by=request.user)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 

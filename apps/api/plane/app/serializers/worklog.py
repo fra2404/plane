@@ -72,9 +72,9 @@ class WorklogPaymentSerializer(BaseSerializer):
             "actor",
             "actor_detail",
             "month",
-            "is_paid",
-            "paid_at",
+            "duration",
             "amount",
+            "paid_at",
             "note",
             "created_at",
             "updated_at",
@@ -87,6 +87,17 @@ class WorklogPaymentSerializer(BaseSerializer):
         value = (value or "").strip()
         if not re.match(r"^\d{4}-\d{2}$", value):
             raise serializers.ValidationError("Month must be in YYYY-MM format.")
+        return value
+
+    def validate_duration(self, value):
+        if value is None:
+            return 0
+        try:
+            value = int(value)
+        except (TypeError, ValueError) as exc:
+            raise serializers.ValidationError("Duration must be an integer (seconds).") from exc
+        if value < 0:
+            raise serializers.ValidationError("Duration cannot be negative.")
         return value
 
     def validate_note(self, value):

@@ -48,9 +48,11 @@ class IssueWorklog(ProjectBaseModel):
 
 
 class WorklogPayment(ProjectBaseModel):
-    """Tracks whether a member's logged hours for a given month/project were paid.
+    """A payment covering logged hours for a member on a project within a month.
 
-    Granularity: (project, actor, month).
+    Multiple payments per (project, actor, month) are allowed, so mid-month or
+    partial payments are kept as separate history rows. `duration` is the amount
+    of hours (seconds) covered by this specific payment.
     """
 
     actor = models.ForeignKey(
@@ -59,27 +61,20 @@ class WorklogPayment(ProjectBaseModel):
         related_name="worklog_payments",
     )
     month = models.CharField(max_length=7, verbose_name="Month (YYYY-MM)")
-    is_paid = models.BooleanField(default=False)
-    paid_at = models.DateField(null=True, blank=True)
+    duration = models.PositiveIntegerField(default=0, verbose_name="Duration covered (seconds)")
     amount = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    paid_at = models.DateField(null=True, blank=True)
     note = models.TextField(blank=True, default="")
 
     class Meta:
         verbose_name = "Worklog Payment"
         verbose_name_plural = "Worklog Payments"
         db_table = "worklog_payments"
-        ordering = ("-month", "project_id")
-        constraints = [
-            models.UniqueConstraint(
-                fields=["project", "actor", "month"],
-                condition=models.Q(deleted_at__isnull=True),
-                name="worklog_payment_unique_project_actor_month",
-            )
-        ]
+        ordering = ("-month", "project_id", "paid_at", "-created_at")
         indexes = [
             models.Index(fields=["workspace", "month"], name="worklog_pay_ws_month_idx"),
             models.Index(fields=["project", "actor", "month"], name="worklog_pay_proj_actor_idx"),
         ]
 
     def __str__(self):
-        return f"{self.project_id} {self.actor_id} {self.month} paid={self.is_paid}"
+        return f"{self.project_id} {self.actor_id} {self.month} {self.duration}s"
