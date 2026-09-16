@@ -24,6 +24,7 @@ export type TIntranetDevice = {
 export type TIntranetLink = {
   id: string;
   workspace: string;
+  project: string | null;
   label: string;
   url: string;
   category: string;

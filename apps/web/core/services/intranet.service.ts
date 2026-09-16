@@ -84,6 +84,48 @@ export class IntranetService extends APIService {
       });
   }
 
+  // Project-scoped useful links
+  async listProjectLinks(workspaceSlug: string, projectId: string): Promise<TIntranetLink[]> {
+    return this.get(`/api/workspaces/${workspaceSlug}/projects/${projectId}/useful-links/`)
+      .then((response) => response?.data)
+      .catch((error) => {
+        throw error?.response?.data;
+      });
+  }
+
+  async createProjectLink(
+    workspaceSlug: string,
+    projectId: string,
+    data: Partial<TIntranetLink>
+  ): Promise<TIntranetLink> {
+    return this.post(`/api/workspaces/${workspaceSlug}/projects/${projectId}/useful-links/`, data)
+      .then((response) => response?.data)
+      .catch((error) => {
+        throw error?.response?.data;
+      });
+  }
+
+  async updateProjectLink(
+    workspaceSlug: string,
+    projectId: string,
+    linkId: string,
+    data: Partial<TIntranetLink>
+  ): Promise<TIntranetLink> {
+    return this.patch(`/api/workspaces/${workspaceSlug}/projects/${projectId}/useful-links/${linkId}/`, data)
+      .then((response) => response?.data)
+      .catch((error) => {
+        throw error?.response?.data;
+      });
+  }
+
+  async deleteProjectLink(workspaceSlug: string, projectId: string, linkId: string): Promise<void> {
+    return this.delete(`/api/workspaces/${workspaceSlug}/projects/${projectId}/useful-links/${linkId}/`)
+      .then((response) => response?.data)
+      .catch((error) => {
+        throw error?.response?.data;
+      });
+  }
+
   // News
   async listNews(workspaceSlug: string): Promise<TIntranetNews[]> {
     return this.get(`/api/workspaces/${workspaceSlug}/intranet/news/`)

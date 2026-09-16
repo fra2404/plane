@@ -108,7 +108,7 @@ const IntranetPage = observer(function IntranetPage() {
         intranetService.listContacts(workspaceSlug),
       ]);
       setDevices(devicesData ?? []);
-      setLinks(linksData ?? []);
+      setLinks((linksData ?? []).filter((link) => !link.project));
       setNews(newsData ?? []);
       setClients(clientsData ?? []);
       setContacts(contactsData ?? []);

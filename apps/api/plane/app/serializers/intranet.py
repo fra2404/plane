@@ -83,6 +83,7 @@ class IntranetLinkSerializer(BaseSerializer):
         fields = [
             "id",
             "workspace",
+            "project",
             "label",
             "url",
             "category",
@@ -99,6 +100,14 @@ class IntranetLinkSerializer(BaseSerializer):
         value = (value or "").strip()
         if not value:
             raise serializers.ValidationError("Label is required.")
+        return value
+
+    def validate_project(self, value):
+        if value is None:
+            return value
+        workspace_slug = self.context.get("workspace_slug")
+        if workspace_slug and value.workspace.slug != workspace_slug:
+            raise serializers.ValidationError("Project does not belong to this workspace.")
         return value
 
 

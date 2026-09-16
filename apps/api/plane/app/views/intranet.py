@@ -19,6 +19,7 @@ from plane.db.models import (
     IntranetDevice,
     IntranetLink,
     IntranetNews,
+    Project,
     Workspace,
 )
 
@@ -112,6 +113,59 @@ class IntranetLinkViewSet(BaseViewSet):
 
     @allow_permission([ROLE.ADMIN], level="WORKSPACE")
     def destroy(self, request, slug, pk):
+        obj = self.get_queryset().filter(pk=pk).first()
+        if not obj:
+            return Response({"error": "Not found."}, status=status.HTTP_404_NOT_FOUND)
+        obj.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class ProjectUsefulLinkViewSet(BaseViewSet):
+    """Project-scoped useful links. Any project member can manage them."""
+
+    model = IntranetLink
+    serializer_class = IntranetLinkSerializer
+
+    def get_queryset(self):
+        return IntranetLink.objects.filter(
+            workspace__slug=self.kwargs.get("slug"),
+            project_id=self.kwargs.get("project_id"),
+        )
+
+    @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST], level="PROJECT")
+    def list(self, request, slug, project_id):
+        return Response(IntranetLinkSerializer(self.get_queryset(), many=True).data)
+
+    @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST], level="PROJECT")
+    def retrieve(self, request, slug, project_id, pk):
+        obj = self.get_queryset().filter(pk=pk).first()
+        if not obj:
+            return Response({"error": "Not found."}, status=status.HTTP_404_NOT_FOUND)
+        return Response(IntranetLinkSerializer(obj).data)
+
+    @allow_permission([ROLE.ADMIN, ROLE.MEMBER], level="PROJECT")
+    def create(self, request, slug, project_id):
+        workspace = Workspace.objects.get(slug=slug)
+        project = Project.objects.get(id=project_id, workspace=workspace)
+        serializer = IntranetLinkSerializer(data=request.data, context={"workspace_slug": slug})
+        if serializer.is_valid():
+            serializer.save(workspace=workspace, project=project, created_by=request.user)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    @allow_permission([ROLE.ADMIN, ROLE.MEMBER], level="PROJECT")
+    def partial_update(self, request, slug, project_id, pk):
+        obj = self.get_queryset().filter(pk=pk).first()
+        if not obj:
+            return Response({"error": "Not found."}, status=status.HTTP_404_NOT_FOUND)
+        serializer = IntranetLinkSerializer(obj, data=request.data, partial=True, context={"workspace_slug": slug})
+        if serializer.is_valid():
+            serializer.save(updated_by=request.user)
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    @allow_permission([ROLE.ADMIN, ROLE.MEMBER], level="PROJECT")
+    def destroy(self, request, slug, project_id, pk):
         obj = self.get_queryset().filter(pk=pk).first()
         if not obj:
             return Response({"error": "Not found."}, status=status.HTTP_404_NOT_FOUND)

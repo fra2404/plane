@@ -10,9 +10,22 @@ from plane.app.views import (
     IntranetDeviceViewSet,
     IntranetLinkViewSet,
     IntranetNewsViewSet,
+    ProjectUsefulLinkViewSet,
 )
 
 urlpatterns = [
+    path(
+        "workspaces/<str:slug>/projects/<uuid:project_id>/useful-links/",
+        ProjectUsefulLinkViewSet.as_view({"get": "list", "post": "create"}),
+        name="project-useful-links",
+    ),
+    path(
+        "workspaces/<str:slug>/projects/<uuid:project_id>/useful-links/<uuid:pk>/",
+        ProjectUsefulLinkViewSet.as_view(
+            {"get": "retrieve", "patch": "partial_update", "delete": "destroy"}
+        ),
+        name="project-useful-link",
+    ),
     path(
         "workspaces/<str:slug>/intranet/devices/",
         IntranetDeviceViewSet.as_view({"get": "list", "post": "create"}),
