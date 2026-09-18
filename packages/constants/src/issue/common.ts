@@ -151,11 +151,13 @@ export const ISSUE_DISPLAY_PROPERTIES_KEYS: (keyof IIssueDisplayProperties)[] = 
   "link",
   "attachment_count",
   "estimate",
+  "total_logged_time",
   "created_on",
   "updated_on",
   "modules",
   "cycle",
   "issue_type",
+  "total_logged_time",
 ];
 
 export const SUB_ISSUES_DISPLAY_PROPERTIES_KEYS: (keyof IIssueDisplayProperties)[] = [
@@ -208,6 +210,7 @@ export const ISSUE_DISPLAY_PROPERTIES: {
   },
   { key: "modules", titleTranslationKey: "common.module" },
   { key: "cycle", titleTranslationKey: "common.cycle" },
+  { key: "total_logged_time", titleTranslationKey: "common.logged_time" },
 ];
 
 export const SPREADSHEET_PROPERTY_LIST: (keyof IIssueDisplayProperties)[] = [
@@ -268,6 +271,14 @@ export const SPREADSHEET_PROPERTY_DETAILS: {
     descendingOrderKey: "-estimate_point__key",
     descendingOrderTitle: "High",
     icon: "EstimatePropertyIcon",
+  },
+  total_logged_time: {
+    i18n_title: "common.logged_time",
+    ascendingOrderKey: "total_logged_time",
+    ascendingOrderTitle: "Low",
+    descendingOrderKey: "-total_logged_time",
+    descendingOrderTitle: "High",
+    icon: "Clock",
   },
   labels: {
     i18n_title: "common.labels",

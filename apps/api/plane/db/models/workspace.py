@@ -54,6 +54,7 @@ def get_default_props():
             "start_date": True,
             "state": True,
             "sub_issue_count": True,
+            "total_logged_time": True,
             "updated_on": True,
         },
     }
@@ -102,6 +103,7 @@ def get_default_display_properties():
             "start_date": True,
             "state": True,
             "sub_issue_count": True,
+            "total_logged_time": True,
             "updated_on": True,
         }
     }

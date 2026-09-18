@@ -308,6 +308,7 @@
   "due_date": "Scadenza",
   "target_date": "Data prevista",
   "estimate": "Stima",
+  "logged_time": "Tempo registrato",
   "change_parent_issue": "Cambia elemento di lavoro principale",
   "remove_parent_issue": "Rimuovi elemento di lavoro principale",
   "add_parent": "Aggiungi elemento principale",

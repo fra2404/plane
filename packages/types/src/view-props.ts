@@ -54,7 +54,9 @@ export type TIssueOrderByOptions =
   | "attachment_count"
   | "-attachment_count"
   | "sub_issues_count"
-  | "-sub_issues_count";
+  | "-sub_issues_count"
+  | "total_logged_time"
+  | "-total_logged_time";
 
 export type TIssueGroupingFilters = "active" | "backlog";
 
@@ -175,6 +177,7 @@ export interface IIssueDisplayProperties {
   modules?: boolean;
   cycle?: boolean;
   issue_type?: boolean;
+  total_logged_time?: boolean;
 }
 
 export type TIssueKanbanFilters = {
