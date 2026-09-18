@@ -49,6 +49,7 @@ class ViewIssueListSerializer(serializers.Serializer):
             "assignee_ids": self.get_assignee_ids(instance),
             "label_ids": self.get_label_ids(instance),
             "module_ids": self.get_module_ids(instance),
+            "total_logged_time": getattr(instance, "total_logged_time", 0) or 0,
         }
         return data
 

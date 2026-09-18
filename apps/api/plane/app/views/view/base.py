@@ -9,11 +9,15 @@ from django.db.models import (
     Exists,
     F,
     Func,
+    IntegerField,
     OuterRef,
     Q,
     Subquery,
     Prefetch,
+    Sum,
+    Value,
 )
+from django.db.models.functions import Coalesce
 from django.utils.decorators import method_decorator
 from django.views.decorators.gzip import gzip_page
 from django.db import transaction
@@ -39,6 +43,7 @@ from plane.db.models import (
     IssueAssignee,
     IssueLabel,
     ModuleIssue,
+    IssueWorklog,
 )
 from plane.utils.issue_filters import issue_filters
 from plane.utils.order_queryset import VIEW_ORDER_BY_ALLOWLIST, order_issue_queryset, sanitize_order_by
@@ -211,6 +216,18 @@ class WorkspaceViewIssuesViewSet(BaseViewSet):
                 Prefetch(
                     "issue_module",
                     queryset=ModuleIssue.objects.all(),
+                )
+            )
+            .annotate(
+                total_logged_time=Coalesce(
+                    Subquery(
+                        IssueWorklog.objects.filter(issue=OuterRef("id"))
+                        .values("issue")
+                        .annotate(total=Sum("duration"))
+                        .values("total")[:1]
+                    ),
+                    Value(0),
+                    output_field=IntegerField(),
                 )
             )
         )
