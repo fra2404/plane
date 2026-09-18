@@ -84,6 +84,7 @@ def get_default_display_properties():
         "start_date": True,
         "state": True,
         "sub_issue_count": True,
+        "total_logged_time": True,
         "updated_on": True,
     }
 
