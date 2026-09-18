@@ -260,6 +260,18 @@ class IssueViewSet(BaseViewSet):
                     .values("count")
                 )
             )
+            .annotate(
+                total_logged_time=Coalesce(
+                    Subquery(
+                        IssueWorklog.objects.filter(issue=OuterRef("id"))
+                        .values("issue")
+                        .annotate(total=Sum("duration"))
+                        .values("total")[:1]
+                    ),
+                    Value(0),
+                    output_field=IntegerField(),
+                )
+            )
         )
 
         return issues
