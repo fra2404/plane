@@ -107,6 +107,10 @@ class UserNotificationPreference(BaseModel):
     mention = models.BooleanField(default=True)
     issue_completed = models.BooleanField(default=True)
 
+    # Discord notification preferences (consumed by the Discord bot)
+    discord_assignment = models.BooleanField(default=True)
+    discord_comment = models.BooleanField(default=False)
+
     class Meta:
         verbose_name = "UserNotificationPreference"
         verbose_name_plural = "UserNotificationPreferences"

@@ -16,6 +16,7 @@ from .invite import urlpatterns as invite_patterns
 from .sticky import urlpatterns as sticky_patterns
 from .worklog import urlpatterns as worklog_patterns
 from .intranet import urlpatterns as intranet_patterns
+from .notification import urlpatterns as notification_patterns
 
 urlpatterns = [
     *asset_patterns,
@@ -32,4 +33,5 @@ urlpatterns = [
     *sticky_patterns,
     *worklog_patterns,
     *intranet_patterns,
+    *notification_patterns,
 ]

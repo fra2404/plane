@@ -162,6 +162,53 @@ export const NotificationsProfileSettingsForm = observer(function NotificationsP
           />
         }
       />
+      <div className="mt-3 flex flex-col gap-y-1 border-t border-subtle-1 pt-3">
+        <span className="text-sm font-medium">{t("discord", { defaultValue: "Discord" })}</span>
+        <SettingsControlItem
+          title={t("discord_assignment", { defaultValue: "Assegnazioni" })}
+          description={t("discord_assignment_description", {
+            defaultValue: "Ricevi un messaggio diretto su Discord quando ti viene assegnato un work item.",
+          })}
+          control={
+            <Controller
+              control={control}
+              name="discord_assignment"
+              render={({ field: { value, onChange } }) => (
+                <ToggleSwitch
+                  value={value}
+                  onChange={(newValue) => {
+                    onChange(newValue);
+                    handleSettingChange("discord_assignment", newValue);
+                  }}
+                  size="sm"
+                />
+              )}
+            />
+          }
+        />
+        <SettingsControlItem
+          title={t("discord_comment", { defaultValue: "Commenti" })}
+          description={t("discord_comment_description", {
+            defaultValue: "Ricevi un messaggio diretto su Discord quando commentano un work item a te assegnato.",
+          })}
+          control={
+            <Controller
+              control={control}
+              name="discord_comment"
+              render={({ field: { value, onChange } }) => (
+                <ToggleSwitch
+                  value={value}
+                  onChange={(newValue) => {
+                    onChange(newValue);
+                    handleSettingChange("discord_comment", newValue);
+                  }}
+                  size="sm"
+                />
+              )}
+            />
+          }
+        />
+      </div>
     </div>
   );
 });

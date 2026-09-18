@@ -10,6 +10,7 @@ import type {
   IntranetLink,
   IntranetNews,
   Paginated,
+  PlaneNotificationPreference,
   PlaneProject,
   PlaneState,
   PlaneUser,
@@ -48,6 +49,7 @@ export interface CreateWorkItemInput {
 export class PlaneClient {
   private projectsCache: { at: number; value: PlaneProject[] } | undefined;
   private membersCache = new Map<string, { at: number; value: PlaneUser[] }>();
+  private preferencesCache: { at: number; value: Map<string, PlaneNotificationPreference> } | undefined;
 
   constructor(
     private readonly baseUrl: string,
@@ -161,6 +163,19 @@ export class PlaneClient {
     );
     const value = this.unwrapResults(data).map(normalizeMember);
     this.membersCache.set(cacheKey, { at: Date.now(), value });
+    return value;
+  }
+
+  /** Per-member Discord notification preferences, keyed by Plane member id. */
+  async getNotificationPreferences(force = false): Promise<Map<string, PlaneNotificationPreference>> {
+    if (!force && this.preferencesCache && Date.now() - this.preferencesCache.at < this.projectsTtlMs) {
+      return this.preferencesCache.value;
+    }
+    const data = await this.request<PlaneNotificationPreference[] | Paginated<PlaneNotificationPreference>>(
+      `/workspaces/${this.workspaceSlug}/notification-preferences/`
+    );
+    const value = new Map(this.unwrapResults(data).map((preference) => [preference.member_id, preference]));
+    this.preferencesCache = { at: Date.now(), value };
     return value;
   }
 

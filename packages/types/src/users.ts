@@ -188,6 +188,8 @@ export interface IUserEmailNotificationSettings {
   comment: boolean;
   mention: boolean;
   issue_completed: boolean;
+  discord_assignment: boolean;
+  discord_comment: boolean;
 }
 
 export type TProfileViews = "assigned" | "created" | "subscribed";

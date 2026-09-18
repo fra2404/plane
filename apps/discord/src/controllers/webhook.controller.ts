@@ -14,8 +14,9 @@ import { buildWebhookMessage, sendChannelMessage, sendDirectMessage } from "@/di
 import { threadName } from "@/discord/threads";
 import { env } from "@/env";
 import { extractProjectId, type ChannelMapper } from "@/lib/mapping";
+import { wantsAssignmentNotification, wantsCommentNotification } from "@/lib/preferences";
 import { verifyPlaneSignature } from "@/lib/signature";
-import type { PlaneUser, PlaneWebhookPayload } from "@/types";
+import type { PlaneUser, PlaneWebhookPayload, PlaneWorkItem } from "@/types";
 
 interface RawBodyRequest extends Request {
   rawBody?: Buffer;
@@ -186,6 +187,64 @@ export class WebhookController {
     return [...result];
   }
 
+  /** Assigned members who still want Discord assignment notifications. */
+  private async filterAssignedByPreference(payload: PlaneWebhookPayload): Promise<string[]> {
+    const memberIds = this.assignedMemberIds(payload);
+    if (memberIds.length === 0) return [];
+    try {
+      const preferences = await this.context.plane.getNotificationPreferences();
+      return memberIds.filter((id) => wantsAssignmentNotification(preferences.get(id)));
+    } catch (error) {
+      logger.warn("DISCORD_WEBHOOK: Unable to read notification preferences, using defaults", error);
+      return memberIds;
+    }
+  }
+
+  /** DM the work item's assignees (who opted in) about a new comment. */
+  private async notifyCommentAssignees(
+    payload: PlaneWebhookPayload,
+    message: { embeds: APIEmbed[]; content?: string }
+  ): Promise<void> {
+    const data = payload.data as Record<string, unknown> | null;
+    const issueId = typeof data?.issue === "string" ? data.issue : undefined;
+    const projectId = extractProjectId(payload);
+    if (!issueId || !projectId) return;
+
+    let workItem: PlaneWorkItem;
+    try {
+      workItem = await this.context.plane.getWorkItem(projectId, issueId);
+    } catch (error) {
+      logger.warn("DISCORD_WEBHOOK: Unable to load work item for comment notification", error);
+      return;
+    }
+
+    const assigneeIds = (workItem.assignees ?? [])
+      .map((assignee) => (typeof assignee === "string" ? assignee : assignee.id))
+      .filter((id): id is string => Boolean(id));
+    const authorId = payload.activity?.actor?.id;
+    const candidates = assigneeIds.filter((id) => id !== authorId);
+    if (candidates.length === 0) return;
+
+    let eligible: string[];
+    try {
+      const preferences = await this.context.plane.getNotificationPreferences();
+      eligible = candidates.filter((id) => wantsCommentNotification(preferences.get(id)));
+    } catch (error) {
+      logger.warn("DISCORD_WEBHOOK: Unable to read notification preferences for comment", error);
+      return;
+    }
+    if (eligible.length === 0) return;
+
+    const discordUserIds = await this.resolveDiscordUserIds(projectId, eligible);
+    if (discordUserIds.length === 0) return;
+
+    const projectLabel = await this.resolveProjectLabel(payload);
+    const content = projectLabel ? `Nuovo commento · ${projectLabel}` : "Nuovo commento";
+    await Promise.all(
+      discordUserIds.map((userId) => sendDirectMessage(this.bot.client, userId, { content, embeds: message.embeds }))
+    );
+  }
+
   private async dispatch(payload: PlaneWebhookPayload): Promise<void> {
     if (payload.event === "issue_comment") {
       const commentChannelId = await this.mapper.resolve(payload);
@@ -202,7 +261,7 @@ export class WebhookController {
       return;
     }
 
-    const assignedMemberIds = this.assignedMemberIds(payload);
+    const assignedMemberIds = await this.filterAssignedByPreference(payload);
     const discordUserIds = assignedMemberIds.length
       ? await this.resolveDiscordUserIds(extractProjectId(payload), assignedMemberIds)
       : [];
@@ -266,6 +325,7 @@ export class WebhookController {
     }
 
     await sendChannelMessage(this.bot.client, link?.threadId ?? channelId, message);
+    await this.notifyCommentAssignees(payload, message);
   }
 
   private async createIssueThread(

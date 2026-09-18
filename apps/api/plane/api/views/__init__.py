@@ -86,3 +86,7 @@ from .intranet import (
     IntranetLinkListAPIEndpoint,
     IntranetNewsListAPIEndpoint,
 )
+
+from .notification import (
+    WorkspaceNotificationPreferencesAPIEndpoint,
+)

@@ -47,6 +47,13 @@ export interface PlaneComment {
   comment_stripped?: string;
 }
 
+export interface PlaneNotificationPreference {
+  member_id: string;
+  email?: string;
+  discord_assignment: boolean;
+  discord_comment: boolean;
+}
+
 export interface IntranetDevice {
   id: string;
   name: string;
