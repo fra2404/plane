@@ -5,7 +5,7 @@
 # Django imports
 from django.contrib.postgres.aggregates import ArrayAgg
 from django.contrib.postgres.fields import ArrayField
-from django.db.models import Q, UUIDField, Value, QuerySet, OuterRef, Subquery
+from django.db.models import Q, UUIDField, Value, QuerySet, OuterRef, Subquery, Sum
 from django.db.models.functions import Coalesce
 
 # Module imports
@@ -21,6 +21,7 @@ from plane.db.models import (
     IssueAssignee,
     ModuleIssue,
     IssueLabel,
+    IssueWorklog,
 )
 from typing import Optional, Dict, Tuple, Any, Union, List
 
@@ -127,7 +128,6 @@ def issue_on_results(
         "is_draft",
         "archived_at",
         "state__group",
-        "total_logged_time",
     ]
 
     if group_by in FIELD_MAPPER:
@@ -139,7 +139,21 @@ def issue_on_results(
         original_list.append(sub_group_by)
 
     required_fields.extend(original_list)
-    return list(issues.values(*required_fields))
+    rows = list(issues.values(*required_fields))
+
+    # Attach total logged time per issue (computed separately so it does not depend
+    # on an annotation being present on the queryset passed in by the paginator).
+    issue_ids = [row["id"] for row in rows]
+    logged_totals = dict(
+        IssueWorklog.objects.filter(issue_id__in=issue_ids)
+        .values("issue_id")
+        .annotate(total=Sum("duration"))
+        .values_list("issue_id", "total")
+    )
+    for row in rows:
+        row["total_logged_time"] = logged_totals.get(row["id"]) or 0
+
+    return rows
 
 
 def issue_group_values(
