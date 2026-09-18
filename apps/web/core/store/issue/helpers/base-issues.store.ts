@@ -1835,6 +1835,11 @@ export abstract class BaseIssuesStore implements IBaseIssuesStore {
       case "-attachment_count":
         return getIssueIds(orderBy(array, "attachment_count", ["desc"]));
 
+      case "total_logged_time":
+        return getIssueIds(orderBy(array, "total_logged_time"));
+      case "-total_logged_time":
+        return getIssueIds(orderBy(array, "total_logged_time", ["desc"]));
+
       case "estimate_point__key":
         return getIssueIds(
           orderBy(array, [

@@ -10,7 +10,7 @@ import { xor } from "lodash-es";
 import { observer } from "mobx-react";
 import { useParams } from "next/navigation";
 // icons
-import { Paperclip } from "lucide-react";
+import { Paperclip, Timer } from "lucide-react";
 // i18n
 import { useTranslation } from "@plane/i18n";
 import { LinkIcon, StartDatePropertyIcon, ViewsIcon, DueDatePropertyIcon } from "@plane/propel/icons";
@@ -19,6 +19,7 @@ import type { TIssue, IIssueDisplayProperties, TIssuePriorities } from "@plane/t
 // ui
 import {
   cn,
+  formatWorklogDuration,
   getDate,
   renderFormattedPayloadDate,
   generateWorkItemLink,
@@ -401,6 +402,30 @@ export const IssueProperties = observer(function IssueProperties(props: IIssuePr
           </div>
         </WithDisplayPropertiesHOC>
       )}
+
+      {/* total logged time */}
+      <WithDisplayPropertiesHOC
+        displayProperties={displayProperties}
+        displayPropertyKey="total_logged_time"
+        shouldRenderProperty={(properties) => !!properties.total_logged_time && !!issue.total_logged_time}
+      >
+        <Tooltip
+          tooltipHeading={t("common.logged_time")}
+          tooltipContent={formatWorklogDuration(issue.total_logged_time ?? 0)}
+          isMobile={isMobile}
+          renderByDefault={false}
+        >
+          {/* oxlint-disable-next-line jsx_a11y/click-events-have-key-events oxlint-disable-next-line jsx_a11y/no-static-element-interactions */}
+          <div
+            className="flex h-5 flex-shrink-0 items-center justify-center gap-2 overflow-hidden rounded-sm border-[0.5px] border-strong px-2.5 py-1"
+            onFocus={handleEventPropagation}
+            onClick={handleEventPropagation}
+          >
+            <Timer className="h-3 w-3 flex-shrink-0" strokeWidth={2} />
+            <div className="text-caption-sm-regular">{formatWorklogDuration(issue.total_logged_time ?? 0)}</div>
+          </div>
+        </Tooltip>
+      </WithDisplayPropertiesHOC>
 
       {/* extra render properties */}
       {/* sub-issues */}
