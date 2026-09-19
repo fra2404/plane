@@ -85,6 +85,9 @@ export const WorkspaceWorklogsRecap = observer(function WorkspaceWorklogsRecap()
     date_to: string;
   }>({ actor_id: "", project_id: "", date_from: "", date_to: "" });
   const [clients, setClients] = useState<{ id: string; name: string }[]>([]);
+  const [activeTab, setActiveTab] = useState<"summary" | "payments" | "log" | "projects" | "members" | "workitems">(
+    "payments"
+  );
   const [paymentFilter, setPaymentFilter] = useState<"all" | "due" | "paid">("due");
   const [paymentActorId, setPaymentActorId] = useState("");
   const [paymentProjectId, setPaymentProjectId] = useState("");
@@ -421,6 +424,30 @@ export const WorkspaceWorklogsRecap = observer(function WorkspaceWorklogsRecap()
           </div>
         </div>
 
+        <div className="flex flex-wrap items-center gap-1 border-b border-subtle pb-3">
+          {(
+            [
+              { key: "payments", label: "Ore pagate" },
+              { key: "summary", label: "Riepilogo" },
+              { key: "log", label: "Registro ore" },
+              { key: "projects", label: "Progetti" },
+              { key: "members", label: "Membri" },
+              { key: "workitems", label: "Work item" },
+            ] as const
+          ).map((tabItem) => (
+            <button
+              key={tabItem.key}
+              type="button"
+              onClick={() => setActiveTab(tabItem.key)}
+              className={`rounded-md px-3 py-1.5 text-body-sm-medium transition ${
+                activeTab === tabItem.key ? "bg-surface-2 text-primary" : "text-tertiary hover:text-primary"
+              }`}
+            >
+              {tabItem.label}
+            </button>
+          ))}
+        </div>
+
         {isLoading && <p className="py-3 text-body-sm-regular text-tertiary">{t("loading")}...</p>}
 
         {!isLoading && hasError && (
@@ -429,7 +456,7 @@ export const WorkspaceWorklogsRecap = observer(function WorkspaceWorklogsRecap()
 
         {!isLoading && !hasError && (
           <div className="space-y-8">
-            <div>
+            <div className={activeTab === "summary" ? "" : "hidden"}>
               <h5 className="pb-2 text-body-sm-medium text-secondary">By month</h5>
               {months.length === 0 ? (
                 <p className="py-2 text-body-sm-regular text-tertiary">{t("activity_empty_state.no_worklogs")}</p>
@@ -463,7 +490,7 @@ export const WorkspaceWorklogsRecap = observer(function WorkspaceWorklogsRecap()
               )}
             </div>
 
-            <div>
+            <div className={activeTab === "payments" ? "" : "hidden"}>
               <h5 className="pb-2 text-body-sm-medium text-secondary">Ore pagate</h5>
               <p className="pb-3 text-body-xs-regular text-tertiary">
                 Storico pagamenti per membro, progetto e mese. Puoi aggiungere più pagamenti nello stesso mese (es.
@@ -759,7 +786,7 @@ export const WorkspaceWorklogsRecap = observer(function WorkspaceWorklogsRecap()
               )}
             </div>
 
-            <div>
+            <div className={activeTab === "log" ? "" : "hidden"}>
               <div className="flex flex-wrap items-center justify-between gap-2 pb-2">
                 <div>
                   <h5 className="text-body-sm-medium text-secondary">Registro ore</h5>
@@ -879,7 +906,7 @@ export const WorkspaceWorklogsRecap = observer(function WorkspaceWorklogsRecap()
               )}
             </div>
 
-            <div>
+            <div className={activeTab === "projects" ? "" : "hidden"}>
               <h5 className="pb-2 text-body-sm-medium text-secondary">Per progetto (budget ore)</h5>
               <p className="pb-2 text-body-xs-regular text-tertiary">
                 Budget generale del progetto; selezionando un mese puoi impostare un budget specifico che ha priorità su
@@ -985,7 +1012,7 @@ export const WorkspaceWorklogsRecap = observer(function WorkspaceWorklogsRecap()
               )}
             </div>
 
-            <div>
+            <div className={activeTab === "members" ? "" : "hidden"}>
               <h5 className="pb-2 text-body-sm-medium text-secondary">{t("common.members")}</h5>
               {userTotals.length === 0 ? (
                 <p className="py-2 text-body-sm-regular text-tertiary">{t("activity_empty_state.no_worklogs")}</p>
@@ -1017,7 +1044,7 @@ export const WorkspaceWorklogsRecap = observer(function WorkspaceWorklogsRecap()
               )}
             </div>
 
-            <div>
+            <div className={activeTab === "workitems" ? "" : "hidden"}>
               <h5 className="pb-2 text-body-sm-medium text-secondary">{t("common.work_item")}</h5>
               {rows.length === 0 ? (
                 <p className="py-2 text-body-sm-regular text-tertiary">{t("activity_empty_state.no_worklogs")}</p>
