@@ -27,12 +27,14 @@ import { formatWorklogDuration } from "@plane/utils";
 import { PageHead } from "@/components/core/page-title";
 // services
 import { IntranetService } from "@/services/intranet.service";
+import { ProjectService } from "@/services/project/project.service";
 import { TeamService } from "@/services/team.service";
 // hooks
 import { useProject } from "@/hooks/store/use-project";
 import { useUserPermissions } from "@/hooks/store/user";
 
 const intranetService = new IntranetService();
+const projectService = new ProjectService();
 const teamService = new TeamService();
 
 const NOTE_KINDS: { key: TClientNoteKind; label: string }[] = [
@@ -49,7 +51,7 @@ const ClientDetailPage = observer(function ClientDetailPage() {
   const cid = clientId?.toString();
 
   const { allowPermissions } = useUserPermissions();
-  const { workspaceProjectIds, getProjectById, updateProject } = useProject();
+  const { updateProject } = useProject();
   const canAdmin = allowPermissions([EUserPermissions.ADMIN], EUserPermissionsLevel.WORKSPACE);
 
   const [detail, setDetail] = useState<TIntranetClientDetail | null>(null);
@@ -67,6 +69,7 @@ const ClientDetailPage = observer(function ClientDetailPage() {
   const [members, setMembers] = useState<{ id: string; name: string }[]>([]);
   const [quoteForm, setQuoteForm] = useState<Partial<TIntranetQuote> | null>(null);
   const [opportunities, setOpportunities] = useState<TIntranetOpportunity[]>([]);
+  const [allProjects, setAllProjects] = useState<{ id: string; name: string }[]>([]);
 
   const load = useCallback(async () => {
     if (!ws || !cid) return;
@@ -80,6 +83,12 @@ const ClientDetailPage = observer(function ClientDetailPage() {
         } catch {
           setOpportunities([]);
         }
+      }
+      try {
+        const projectData = await projectService.getProjectsLite(ws);
+        setAllProjects((projectData ?? []).map((project) => ({ id: project.id, name: project.name })));
+      } catch {
+        setAllProjects([]);
       }
       const team = await teamService.listTeam(ws);
       setMembers(
@@ -101,8 +110,8 @@ const ClientDetailPage = observer(function ClientDetailPage() {
 
   const linkedIds = useMemo(() => new Set((detail?.projects ?? []).map((project) => project.id)), [detail]);
   const availableProjects = useMemo(
-    () => (workspaceProjectIds ?? []).filter((projectId) => !linkedIds.has(projectId)),
-    [workspaceProjectIds, linkedIds]
+    () => allProjects.filter((project) => !linkedIds.has(project.id)),
+    [allProjects, linkedIds]
   );
 
   const saveClient = async () => {
@@ -364,9 +373,9 @@ const ClientDetailPage = observer(function ClientDetailPage() {
                     className="min-w-56 rounded-md border border-subtle bg-surface-1 px-2.5 py-1.5 text-body-sm-regular text-primary outline-none"
                   >
                     <option value="">Collega un progetto…</option>
-                    {availableProjects.map((projectId) => (
-                      <option key={projectId} value={projectId}>
-                        {getProjectById(projectId)?.name ?? projectId}
+                    {availableProjects.map((project) => (
+                      <option key={project.id} value={project.id}>
+                        {project.name}
                       </option>
                     ))}
                   </select>
