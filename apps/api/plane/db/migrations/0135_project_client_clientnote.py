@@ -12,7 +12,7 @@ from django.db import migrations, models
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("db", "0133_workspace_team_member"),
+        ("db", "0134_usernotificationpreference_discord"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
