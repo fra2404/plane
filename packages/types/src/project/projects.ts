@@ -63,6 +63,7 @@ export interface IProject extends IPartialProject {
   budget_hours?: number | null;
   budget_months?: Record<string, number>;
   client?: string | null;
+  contract_value?: string | null;
 }
 
 export type TProjectAnalyticsCountParams = {

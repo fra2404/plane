@@ -156,6 +156,8 @@ from .intranet import (
     IntranetNewsViewSet,
     IntranetOpportunityViewSet,
     IntranetQuoteViewSet,
+    ProjectExpenseViewSet,
+    ProjectsMarginEndpoint,
     ProjectUsefulLinkViewSet,
 )
 from .anniversary import WorkspaceAnniversaryEndpoint

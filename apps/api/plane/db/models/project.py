@@ -99,6 +99,8 @@ class Project(BaseModel):
     budget_hours = models.FloatField(null=True, blank=True)
     # Optional monthly overrides: {"2026-09": 80, "2026-10": 60}
     budget_months = models.JSONField(default=dict, blank=True)
+    # Agreed revenue for the project (ricavo), used for margin reports
+    contract_value = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
     client = models.ForeignKey(
         "db.IntranetClient",
         on_delete=models.SET_NULL,
@@ -381,3 +383,23 @@ class ProjectUserProperty(ProjectBaseModel):
     def __str__(self):
         """Return properties status of the project"""
         return str(self.user)
+
+
+class ProjectExpense(ProjectBaseModel):
+    """Cost/expense booked on a project (spese)."""
+
+    date = models.DateField(null=True, blank=True)
+    category = models.CharField(max_length=100, blank=True, default="")
+    vendor = models.CharField(max_length=255, blank=True, default="")
+    amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    description = models.TextField(blank=True, default="")
+
+    class Meta:
+        verbose_name = "Project Expense"
+        verbose_name_plural = "Project Expenses"
+        db_table = "project_expenses"
+        ordering = ("-date", "-created_at")
+        indexes = [models.Index(fields=["project", "date"], name="project_expense_proj_date_idx")]
+
+    def __str__(self):
+        return f"{self.project_id} {self.amount}"

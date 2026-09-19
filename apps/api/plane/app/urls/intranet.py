@@ -14,6 +14,8 @@ from plane.app.views import (
     CRMSummaryEndpoint,
     IntranetOpportunityViewSet,
     IntranetQuoteViewSet,
+    ProjectExpenseViewSet,
+    ProjectsMarginEndpoint,
     ProjectUsefulLinkViewSet,
 )
 
@@ -27,6 +29,21 @@ urlpatterns = [
         "workspaces/<str:slug>/intranet/quotes/<uuid:pk>/",
         IntranetQuoteViewSet.as_view({"patch": "partial_update", "delete": "destroy"}),
         name="workspace-intranet-quote",
+    ),
+    path(
+        "workspaces/<str:slug>/expenses/",
+        ProjectExpenseViewSet.as_view({"get": "list", "post": "create"}),
+        name="workspace-project-expenses",
+    ),
+    path(
+        "workspaces/<str:slug>/expenses/<uuid:pk>/",
+        ProjectExpenseViewSet.as_view({"patch": "partial_update", "delete": "destroy"}),
+        name="workspace-project-expense",
+    ),
+    path(
+        "workspaces/<str:slug>/projects-margin/",
+        ProjectsMarginEndpoint.as_view(),
+        name="workspace-projects-margin",
     ),
     path(
         "workspaces/<str:slug>/crm-summary/",

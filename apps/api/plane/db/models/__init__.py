@@ -50,6 +50,7 @@ from .module import Module, ModuleIssue, ModuleLink, ModuleMember, ModuleUserPro
 from .notification import EmailNotificationLog, Notification, UserNotificationPreference
 from .page import Page, PageLabel, PageLog, ProjectPage, PageVersion
 from .project import (
+    ProjectExpense,
     Project,
     ProjectBaseModel,
     ProjectIdentifier,

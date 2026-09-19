@@ -17,6 +17,7 @@ import type {
   TClientNoteKind,
   TIntranetClientDetail,
   TIntranetClientStatus,
+  TIntranetOpportunity,
   TIntranetQuote,
   TQuoteStatus,
 } from "@plane/types";
@@ -65,6 +66,7 @@ const ClientDetailPage = observer(function ClientDetailPage() {
   const [noteAssignee, setNoteAssignee] = useState("");
   const [members, setMembers] = useState<{ id: string; name: string }[]>([]);
   const [quoteForm, setQuoteForm] = useState<Partial<TIntranetQuote> | null>(null);
+  const [opportunities, setOpportunities] = useState<TIntranetOpportunity[]>([]);
 
   const load = useCallback(async () => {
     if (!ws || !cid) return;
@@ -72,6 +74,13 @@ const ClientDetailPage = observer(function ClientDetailPage() {
     setHasError(false);
     try {
       setDetail(await intranetService.getClient(ws, cid));
+      if (canAdmin) {
+        try {
+          setOpportunities((await intranetService.listOpportunities(ws)) ?? []);
+        } catch {
+          setOpportunities([]);
+        }
+      }
       const team = await teamService.listTeam(ws);
       setMembers(
         (team ?? []).map((member) => ({
@@ -84,7 +93,7 @@ const ClientDetailPage = observer(function ClientDetailPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [ws, cid]);
+  }, [ws, cid, canAdmin]);
 
   useEffect(() => {
     void load();
@@ -193,6 +202,7 @@ const ClientDetailPage = observer(function ClientDetailPage() {
         title: quoteForm.title,
         code: quoteForm.code ?? "",
         client: cid,
+        opportunity: quoteForm.opportunity ?? null,
         status: (quoteForm.status ?? "bozza") as TQuoteStatus,
         amount: String(quoteForm.amount ?? "0"),
         tax_rate: String(quoteForm.tax_rate ?? "22"),
@@ -444,6 +454,20 @@ const ClientDetailPage = observer(function ClientDetailPage() {
                       <option value="accettato">Accettato</option>
                       <option value="rifiutato">Rifiutato</option>
                       <option value="scaduto">Scaduto</option>
+                    </select>
+                    <select
+                      value={quoteForm.opportunity ?? ""}
+                      onChange={(event) => setQuoteForm({ ...quoteForm, opportunity: event.target.value || null })}
+                      className="rounded-md border border-subtle bg-surface-1 px-2.5 py-1.5 text-body-sm-regular text-primary outline-none"
+                    >
+                      <option value="">Nessuna opportunità</option>
+                      {opportunities
+                        .filter((opportunity) => !opportunity.client || opportunity.client === cid)
+                        .map((opportunity) => (
+                          <option key={opportunity.id} value={opportunity.id}>
+                            {opportunity.name}
+                          </option>
+                        ))}
                     </select>
                     <Input
                       placeholder="Importo netto €"

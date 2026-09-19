@@ -16,6 +16,8 @@ import type {
   TIntranetOpportunity,
   TIntranetQuote,
   TCrmsummary,
+  TProjectExpense,
+  TProjectMargin,
 } from "@plane/types";
 // services
 import { APIService } from "@/services/api.service";
@@ -279,6 +281,40 @@ export class IntranetService extends APIService {
 
   async deleteQuote(workspaceSlug: string, quoteId: string): Promise<void> {
     return this.delete(`/api/workspaces/${workspaceSlug}/intranet/quotes/${quoteId}/`)
+      .then((response) => response?.data)
+      .catch((error) => {
+        throw error?.response?.data;
+      });
+  }
+
+  async listExpenses(workspaceSlug: string, projectId?: string): Promise<TProjectExpense[]> {
+    return this.get(`/api/workspaces/${workspaceSlug}/expenses/`, {
+      params: projectId ? { project_id: projectId } : undefined,
+    })
+      .then((response) => response?.data)
+      .catch((error) => {
+        throw error?.response?.data;
+      });
+  }
+
+  async createExpense(workspaceSlug: string, data: Partial<TProjectExpense>): Promise<TProjectExpense> {
+    return this.post(`/api/workspaces/${workspaceSlug}/expenses/`, data)
+      .then((response) => response?.data)
+      .catch((error) => {
+        throw error?.response?.data;
+      });
+  }
+
+  async deleteExpense(workspaceSlug: string, expenseId: string): Promise<void> {
+    return this.delete(`/api/workspaces/${workspaceSlug}/expenses/${expenseId}/`)
+      .then((response) => response?.data)
+      .catch((error) => {
+        throw error?.response?.data;
+      });
+  }
+
+  async fetchProjectsMargin(workspaceSlug: string): Promise<{ results: TProjectMargin[] }> {
+    return this.get(`/api/workspaces/${workspaceSlug}/projects-margin/`)
       .then((response) => response?.data)
       .catch((error) => {
         throw error?.response?.data;

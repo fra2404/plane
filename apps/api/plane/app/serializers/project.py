@@ -21,6 +21,7 @@ from plane.db.models import (
     DeployBoard,
     ProjectPublicMember,
     IssueSequence,
+    ProjectExpense,
 )
 from plane.utils.content_validator import (
     validate_html_content,
@@ -259,3 +260,23 @@ class ProjectPublicMemberSerializer(BaseSerializer):
         model = ProjectPublicMember
         fields = "__all__"
         read_only_fields = ["workspace", "project", "member"]
+
+
+class ProjectExpenseSerializer(BaseSerializer):
+    class Meta:
+        model = ProjectExpense
+        fields = [
+            "id",
+            "workspace",
+            "project",
+            "date",
+            "category",
+            "vendor",
+            "amount",
+            "description",
+            "created_at",
+            "updated_at",
+            "created_by",
+            "updated_by",
+        ]
+        read_only_fields = ["id", "workspace", "created_at", "updated_at", "created_by", "updated_by"]

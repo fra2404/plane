@@ -206,3 +206,28 @@ export type TIntranetClientDetail = TIntranetClient & {
   timeline: TClientNote[];
   quotes?: TIntranetQuote[];
 };
+
+export type TProjectExpense = {
+  id: string;
+  project: string;
+  date: string | null;
+  category: string;
+  vendor: string;
+  amount: string;
+  description: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type TProjectMargin = {
+  project_id: string;
+  project_name: string;
+  project_identifier: string;
+  client_id: string | null;
+  client_name: string | null;
+  contract_value: string;
+  logged_time: number;
+  labor_cost: string;
+  expenses: string;
+  margin: string;
+};

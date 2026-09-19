@@ -16,6 +16,7 @@ from plane.app.serializers import (
     IntranetClientSerializer,
     IntranetOpportunitySerializer,
     IntranetQuoteSerializer,
+    ProjectExpenseSerializer,
     IntranetContactSerializer,
     IntranetDeviceSerializer,
     IntranetLinkSerializer,
@@ -32,6 +33,7 @@ from plane.db.models import (
     IntranetQuote,
     IssueWorklog,
     Project,
+    ProjectExpense,
     Workspace,
     WorkspaceMember,
     WorklogPayment,
@@ -443,7 +445,11 @@ class IntranetOpportunityViewSet(BaseViewSet):
             return Response({"error": "Not found."}, status=status.HTTP_404_NOT_FOUND)
         serializer = IntranetOpportunitySerializer(obj, data=request.data, partial=True)
         if serializer.is_valid():
-            serializer.save(updated_by=request.user)
+            opportunity = serializer.save(updated_by=request.user)
+            if opportunity.stage == "vinto":
+                IntranetQuote.objects.filter(opportunity=opportunity, deleted_at__isnull=True).exclude(
+                    status="accettato"
+                ).update(status="accettato")
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -486,7 +492,9 @@ class IntranetQuoteViewSet(BaseViewSet):
             return Response({"error": "client is required."}, status=status.HTTP_400_BAD_REQUEST)
         serializer = IntranetQuoteSerializer(data={**request.data, "client": str(client.id)})
         if serializer.is_valid():
-            serializer.save(workspace=workspace, client=client, created_by=request.user)
+            quote = serializer.save(workspace=workspace, client=client, created_by=request.user)
+            if quote.status == "accettato" and quote.opportunity_id:
+                IntranetOpportunity.objects.filter(pk=quote.opportunity_id).update(stage="vinto")
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -497,7 +505,9 @@ class IntranetQuoteViewSet(BaseViewSet):
             return Response({"error": "Not found."}, status=status.HTTP_404_NOT_FOUND)
         serializer = IntranetQuoteSerializer(obj, data=request.data, partial=True)
         if serializer.is_valid():
-            serializer.save(updated_by=request.user)
+            quote = serializer.save(updated_by=request.user)
+            if quote.status == "accettato" and quote.opportunity_id:
+                IntranetOpportunity.objects.filter(pk=quote.opportunity_id).update(stage="vinto")
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -599,3 +609,111 @@ class CRMSummaryEndpoint(BaseAPIView):
             },
             status=status.HTTP_200_OK,
         )
+
+
+class ProjectExpenseViewSet(BaseViewSet):
+    """Project expenses (spese), admin only."""
+
+    model = ProjectExpense
+    serializer_class = ProjectExpenseSerializer
+
+    def get_queryset(self):
+        return ProjectExpense.objects.filter(workspace__slug=self.kwargs.get("slug")).select_related("project")
+
+    @allow_permission([ROLE.ADMIN], level="WORKSPACE")
+    def list(self, request, slug):
+        queryset = self.get_queryset()
+        project_id = request.GET.get("project_id")
+        if project_id:
+            queryset = queryset.filter(project_id=project_id)
+        return Response(ProjectExpenseSerializer(queryset, many=True).data)
+
+    @allow_permission([ROLE.ADMIN], level="WORKSPACE")
+    def create(self, request, slug):
+        workspace = Workspace.objects.get(slug=slug)
+        project = Project.objects.filter(
+            pk=request.data.get("project"), workspace=workspace, archived_at__isnull=True
+        ).first()
+        if not project:
+            return Response({"error": "project is required."}, status=status.HTTP_400_BAD_REQUEST)
+        serializer = ProjectExpenseSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save(workspace=workspace, project=project, created_by=request.user)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    @allow_permission([ROLE.ADMIN], level="WORKSPACE")
+    def partial_update(self, request, slug, pk):
+        obj = self.get_queryset().filter(pk=pk).first()
+        if not obj:
+            return Response({"error": "Not found."}, status=status.HTTP_404_NOT_FOUND)
+        serializer = ProjectExpenseSerializer(obj, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save(updated_by=request.user)
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    @allow_permission([ROLE.ADMIN], level="WORKSPACE")
+    def destroy(self, request, slug, pk):
+        obj = self.get_queryset().filter(pk=pk).first()
+        if not obj:
+            return Response({"error": "Not found."}, status=status.HTTP_404_NOT_FOUND)
+        obj.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class ProjectsMarginEndpoint(BaseAPIView):
+    """Admin-only per-project revenue / cost / margin report."""
+
+    permission_classes = [WorkspaceEntityPermission]
+
+    def get(self, request, slug):
+        is_admin = WorkspaceMember.objects.filter(
+            workspace__slug=slug, member=request.user, role=ROLE.ADMIN.value, is_active=True
+        ).exists()
+        if not is_admin:
+            return Response(
+                {"error": "You don't have the required permissions."}, status=status.HTTP_403_FORBIDDEN
+            )
+
+        projects = Project.objects.filter(workspace__slug=slug, archived_at__isnull=True).select_related("client")
+        logged = {
+            row["project_id"]: row["total"]
+            for row in IssueWorklog.objects.filter(project__in=projects)
+            .values("project_id")
+            .annotate(total=Sum("duration"))
+        }
+        paid = {
+            row["project_id"]: row["total"]
+            for row in WorklogPayment.objects.filter(project__in=projects, deleted_at__isnull=True)
+            .values("project_id")
+            .annotate(total=Sum("amount"))
+        }
+        expenses = {
+            row["project_id"]: row["total"]
+            for row in ProjectExpense.objects.filter(project__in=projects, deleted_at__isnull=True)
+            .values("project_id")
+            .annotate(total=Sum("amount"))
+        }
+
+        results = []
+        for project in projects:
+            revenue = project.contract_value or Decimal("0")
+            labor_cost = paid.get(project.id) or Decimal("0")
+            expense_cost = expenses.get(project.id) or Decimal("0")
+            results.append(
+                {
+                    "project_id": str(project.id),
+                    "project_name": project.name,
+                    "project_identifier": project.identifier,
+                    "client_id": str(project.client_id) if project.client_id else None,
+                    "client_name": project.client.name if project.client else None,
+                    "contract_value": str(revenue),
+                    "logged_time": logged.get(project.id) or 0,
+                    "labor_cost": str(labor_cost),
+                    "expenses": str(expense_cost),
+                    "margin": str(revenue - labor_cost - expense_cost),
+                }
+            )
+
+        return Response({"results": results}, status=status.HTTP_200_OK)

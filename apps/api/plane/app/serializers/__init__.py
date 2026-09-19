@@ -30,6 +30,7 @@ from .workspace import (
     StickySerializer,
 )
 from .project import (
+    ProjectExpenseSerializer,
     ProjectSerializer,
     ProjectListSerializer,
     ProjectDetailSerializer,
