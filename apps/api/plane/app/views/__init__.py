@@ -147,6 +147,7 @@ from .issue.worklog import (
     WorklogPaymentViewSet,
 )
 from .intranet import (
+    ClientNoteViewSet,
     IntranetClientViewSet,
     IntranetContactViewSet,
     IntranetDeviceViewSet,

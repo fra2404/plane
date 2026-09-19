@@ -2,11 +2,15 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+from decimal import Decimal
+
+from django.db.models import Sum
 from rest_framework import status
 from rest_framework.response import Response
 
 from plane.app.permissions import ROLE, allow_permission
 from plane.app.serializers import (
+    ClientNoteSerializer,
     IntranetClientSerializer,
     IntranetContactSerializer,
     IntranetDeviceSerializer,
@@ -14,13 +18,16 @@ from plane.app.serializers import (
     IntranetNewsSerializer,
 )
 from plane.db.models import (
+    ClientNote,
     IntranetClient,
     IntranetContact,
     IntranetDevice,
     IntranetLink,
     IntranetNews,
+    IssueWorklog,
     Project,
     Workspace,
+    WorklogPayment,
 )
 
 from .base import BaseViewSet
@@ -236,7 +243,30 @@ class IntranetClientViewSet(BaseViewSet):
         obj = self.get_queryset().filter(pk=pk).first()
         if not obj:
             return Response({"error": "Not found."}, status=status.HTTP_404_NOT_FOUND)
-        return Response(IntranetClientSerializer(obj).data)
+        projects = Project.objects.filter(workspace=obj.workspace, client=obj, archived_at__isnull=True)
+        total_logged_time = IssueWorklog.objects.filter(project__in=projects).aggregate(total=Sum("duration"))[
+            "total"
+        ] or 0
+        total_paid_amount = WorklogPayment.objects.filter(
+            project__in=projects, deleted_at__isnull=True
+        ).aggregate(total=Sum("amount"))["total"] or Decimal("0")
+        notes = ClientNote.objects.filter(client=obj).select_related("author")
+        data = IntranetClientSerializer(obj).data
+        data["contacts"] = IntranetContactSerializer(obj.contacts.all(), many=True).data
+        data["projects"] = [
+            {
+                "id": str(project.id),
+                "name": project.name,
+                "identifier": project.identifier,
+                "budget_hours": project.budget_hours,
+                "budget_months": project.budget_months or {},
+            }
+            for project in projects
+        ]
+        data["total_logged_time"] = total_logged_time
+        data["total_paid_amount"] = str(total_paid_amount)
+        data["timeline"] = ClientNoteSerializer(notes, many=True).data
+        return Response(data)
 
     @allow_permission([ROLE.ADMIN], level="WORKSPACE")
     def create(self, request, slug):
@@ -311,4 +341,41 @@ class IntranetContactViewSet(BaseViewSet):
         if not obj:
             return Response({"error": "Not found."}, status=status.HTTP_404_NOT_FOUND)
         obj.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class ClientNoteViewSet(BaseViewSet):
+    """Timeline notes for an intranet client."""
+
+    model = ClientNote
+    serializer_class = ClientNoteSerializer
+
+    def get_queryset(self):
+        return ClientNote.objects.filter(
+            workspace__slug=self.kwargs.get("slug"),
+            client_id=self.kwargs.get("client_id"),
+        ).select_related("author")
+
+    @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST], level="WORKSPACE")
+    def list(self, request, slug, client_id):
+        return Response(ClientNoteSerializer(self.get_queryset(), many=True).data)
+
+    @allow_permission([ROLE.ADMIN, ROLE.MEMBER], level="WORKSPACE")
+    def create(self, request, slug, client_id):
+        workspace = Workspace.objects.get(slug=slug)
+        client = IntranetClient.objects.filter(pk=client_id, workspace=workspace).first()
+        if not client:
+            return Response({"error": "Not found."}, status=status.HTTP_404_NOT_FOUND)
+        serializer = ClientNoteSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save(workspace=workspace, client=client, author=request.user, created_by=request.user)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    @allow_permission([ROLE.ADMIN, ROLE.MEMBER], level="WORKSPACE")
+    def destroy(self, request, slug, client_id, pk):
+        note = self.get_queryset().filter(pk=pk).first()
+        if not note:
+            return Response({"error": "Not found."}, status=status.HTTP_404_NOT_FOUND)
+        note.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)

@@ -6,7 +6,7 @@ from rest_framework import serializers
 
 from plane.app.serializers.base import BaseSerializer
 from plane.app.serializers.user import UserLiteSerializer
-from plane.db.models import IntranetClient, IntranetContact, IntranetDevice, IntranetLink, IntranetNews
+from plane.db.models import ClientNote, IntranetClient, IntranetContact, IntranetDevice, IntranetLink, IntranetNews
 
 
 class IntranetDeviceSerializer(BaseSerializer):
@@ -164,3 +164,25 @@ class IntranetContactSerializer(BaseSerializer):
         if not value:
             raise serializers.ValidationError("Name is required.")
         return value
+
+
+class ClientNoteSerializer(BaseSerializer):
+    author_detail = UserLiteSerializer(read_only=True, source="author")
+
+    class Meta:
+        model = ClientNote
+        fields = [
+            "id",
+            "workspace",
+            "client",
+            "author",
+            "author_detail",
+            "kind",
+            "content",
+            "occurred_at",
+            "created_at",
+            "updated_at",
+            "created_by",
+            "updated_by",
+        ]
+        read_only_fields = ["id", "workspace", "author", "created_at", "updated_at", "created_by", "updated_by"]

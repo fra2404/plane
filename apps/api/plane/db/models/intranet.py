@@ -3,6 +3,7 @@
 # See the LICENSE file for details.
 
 from django.db import models
+from django.utils import timezone
 
 from .workspace import WorkspaceBaseModel
 
@@ -136,3 +137,37 @@ class IntranetContact(WorkspaceBaseModel):
 
     def __str__(self):
         return self.name
+
+
+class ClientNote(WorkspaceBaseModel):
+    """Timeline entry for a client (note, call, meeting, email...)."""
+
+    KIND_CHOICES = (
+        ("nota", "Nota"),
+        ("chiamata", "Chiamata"),
+        ("meeting", "Meeting"),
+        ("email", "Email"),
+        ("altro", "Altro"),
+    )
+
+    client = models.ForeignKey("db.IntranetClient", on_delete=models.CASCADE, related_name="notes")
+    author = models.ForeignKey(
+        "db.User",
+        on_delete=models.SET_NULL,
+        related_name="client_notes",
+        null=True,
+        blank=True,
+    )
+    kind = models.CharField(max_length=20, choices=KIND_CHOICES, default="nota")
+    content = models.TextField(blank=True, default="")
+    occurred_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        verbose_name = "Client Note"
+        verbose_name_plural = "Client Notes"
+        db_table = "intranet_client_notes"
+        ordering = ("-occurred_at", "-created_at")
+        indexes = [models.Index(fields=["workspace", "client", "occurred_at"], name="client_note_ws_client_idx")]
+
+    def __str__(self):
+        return f"{self.client_id} {self.kind}"

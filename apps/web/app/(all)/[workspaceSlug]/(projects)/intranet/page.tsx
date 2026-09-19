@@ -6,6 +6,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { observer } from "mobx-react";
+import Link from "next/link";
 import { useParams } from "next/navigation";
 import { ExternalLink, Pencil, Plus, Trash2 } from "lucide-react";
 // plane imports
@@ -718,7 +719,14 @@ const IntranetPage = observer(function IntranetPage() {
                   <tbody>
                     {clients.map((client) => (
                       <tr key={client.id} className="border-t border-subtle">
-                        <td className="px-3 py-2 text-primary">{client.name}</td>
+                        <td className="px-3 py-2 text-primary">
+                          <Link
+                            href={`/${workspaceSlug}/intranet/clients/${client.id}`}
+                            className="hover:text-accent-primary hover:underline"
+                          >
+                            {client.name}
+                          </Link>
+                        </td>
                         <td className="px-3 py-2 text-secondary">{client.vat}</td>
                         <td className="px-3 py-2 text-secondary">{client.email}</td>
                         <td className="px-3 py-2 text-secondary">{client.phone}</td>

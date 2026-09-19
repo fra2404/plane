@@ -5,6 +5,7 @@
 from django.urls import path
 
 from plane.app.views import (
+    ClientNoteViewSet,
     IntranetClientViewSet,
     IntranetContactViewSet,
     IntranetDeviceViewSet,
@@ -67,6 +68,16 @@ urlpatterns = [
         "workspaces/<str:slug>/intranet/clients/<uuid:pk>/",
         IntranetClientViewSet.as_view({"get": "retrieve", "patch": "partial_update", "delete": "destroy"}),
         name="workspace-intranet-client",
+    ),
+    path(
+        "workspaces/<str:slug>/intranet/clients/<uuid:client_id>/notes/",
+        ClientNoteViewSet.as_view({"get": "list", "post": "create"}),
+        name="intranet-client-notes",
+    ),
+    path(
+        "workspaces/<str:slug>/intranet/clients/<uuid:client_id>/notes/<uuid:pk>/",
+        ClientNoteViewSet.as_view({"delete": "destroy"}),
+        name="intranet-client-note",
     ),
     path(
         "workspaces/<str:slug>/intranet/contacts/",

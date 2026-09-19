@@ -130,6 +130,7 @@ from .worklog import IssueWorklogSerializer, WorklogPaymentSerializer
 from .team import WorkspaceTeamMemberSerializer
 
 from .intranet import (
+    ClientNoteSerializer,
     IntranetClientSerializer,
     IntranetContactSerializer,
     IntranetDeviceSerializer,

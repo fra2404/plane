@@ -123,3 +123,33 @@ export type TTeamMemberPayload = {
   linkedin?: string;
   notes?: string;
 };
+
+export type TClientNoteKind = "nota" | "chiamata" | "meeting" | "email" | "altro";
+
+export type TClientNote = {
+  id: string;
+  client: string;
+  author: string | null;
+  author_detail: IUserLite | null;
+  kind: TClientNoteKind;
+  content: string;
+  occurred_at: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type TIntranetClientProject = {
+  id: string;
+  name: string;
+  identifier: string;
+  budget_hours: number | null;
+  budget_months: Record<string, number>;
+};
+
+export type TIntranetClientDetail = TIntranetClient & {
+  contacts: TIntranetContact[];
+  projects: TIntranetClientProject[];
+  total_logged_time: number;
+  total_paid_amount: string;
+  timeline: TClientNote[];
+};

@@ -108,6 +108,10 @@ export const coreRoutes: RouteConfigEntry[] = [
         // Intranet
         layout("./(all)/[workspaceSlug]/(projects)/intranet/layout.tsx", [
           route(":workspaceSlug/intranet", "./(all)/[workspaceSlug]/(projects)/intranet/page.tsx"),
+          route(
+            ":workspaceSlug/intranet/clients/:clientId",
+            "./(all)/[workspaceSlug]/(projects)/intranet/clients/[clientId]/page.tsx"
+          ),
         ]),
 
         // Worklogs (admin)

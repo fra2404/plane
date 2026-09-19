@@ -5,7 +5,15 @@
  */
 
 import { API_BASE_URL } from "@plane/constants";
-import type { TIntranetClient, TIntranetContact, TIntranetDevice, TIntranetLink, TIntranetNews } from "@plane/types";
+import type {
+  TClientNote,
+  TIntranetClient,
+  TIntranetClientDetail,
+  TIntranetContact,
+  TIntranetDevice,
+  TIntranetLink,
+  TIntranetNews,
+} from "@plane/types";
 // services
 import { APIService } from "@/services/api.service";
 
@@ -182,6 +190,38 @@ export class IntranetService extends APIService {
     data: Partial<TIntranetClient>
   ): Promise<TIntranetClient> {
     return this.patch(`/api/workspaces/${workspaceSlug}/intranet/clients/${clientId}/`, data)
+      .then((response) => response?.data)
+      .catch((error) => {
+        throw error?.response?.data;
+      });
+  }
+
+  async getClient(workspaceSlug: string, clientId: string): Promise<TIntranetClientDetail> {
+    return this.get(`/api/workspaces/${workspaceSlug}/intranet/clients/${clientId}/`)
+      .then((response) => response?.data)
+      .catch((error) => {
+        throw error?.response?.data;
+      });
+  }
+
+  async listClientNotes(workspaceSlug: string, clientId: string): Promise<TClientNote[]> {
+    return this.get(`/api/workspaces/${workspaceSlug}/intranet/clients/${clientId}/notes/`)
+      .then((response) => response?.data)
+      .catch((error) => {
+        throw error?.response?.data;
+      });
+  }
+
+  async createClientNote(workspaceSlug: string, clientId: string, data: Partial<TClientNote>): Promise<TClientNote> {
+    return this.post(`/api/workspaces/${workspaceSlug}/intranet/clients/${clientId}/notes/`, data)
+      .then((response) => response?.data)
+      .catch((error) => {
+        throw error?.response?.data;
+      });
+  }
+
+  async deleteClientNote(workspaceSlug: string, clientId: string, noteId: string): Promise<void> {
+    return this.delete(`/api/workspaces/${workspaceSlug}/intranet/clients/${clientId}/notes/${noteId}/`)
       .then((response) => response?.data)
       .catch((error) => {
         throw error?.response?.data;
