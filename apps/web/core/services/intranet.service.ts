@@ -13,6 +13,7 @@ import type {
   TIntranetDevice,
   TIntranetLink,
   TIntranetNews,
+  TIntranetOpportunity,
 } from "@plane/types";
 // services
 import { APIService } from "@/services/api.service";
@@ -214,6 +215,55 @@ export class IntranetService extends APIService {
 
   async createClientNote(workspaceSlug: string, clientId: string, data: Partial<TClientNote>): Promise<TClientNote> {
     return this.post(`/api/workspaces/${workspaceSlug}/intranet/clients/${clientId}/notes/`, data)
+      .then((response) => response?.data)
+      .catch((error) => {
+        throw error?.response?.data;
+      });
+  }
+
+  async listOpportunities(workspaceSlug: string): Promise<TIntranetOpportunity[]> {
+    return this.get(`/api/workspaces/${workspaceSlug}/intranet/opportunities/`)
+      .then((response) => response?.data)
+      .catch((error) => {
+        throw error?.response?.data;
+      });
+  }
+
+  async createOpportunity(workspaceSlug: string, data: Partial<TIntranetOpportunity>): Promise<TIntranetOpportunity> {
+    return this.post(`/api/workspaces/${workspaceSlug}/intranet/opportunities/`, data)
+      .then((response) => response?.data)
+      .catch((error) => {
+        throw error?.response?.data;
+      });
+  }
+
+  async updateOpportunity(
+    workspaceSlug: string,
+    opportunityId: string,
+    data: Partial<TIntranetOpportunity>
+  ): Promise<TIntranetOpportunity> {
+    return this.patch(`/api/workspaces/${workspaceSlug}/intranet/opportunities/${opportunityId}/`, data)
+      .then((response) => response?.data)
+      .catch((error) => {
+        throw error?.response?.data;
+      });
+  }
+
+  async deleteOpportunity(workspaceSlug: string, opportunityId: string): Promise<void> {
+    return this.delete(`/api/workspaces/${workspaceSlug}/intranet/opportunities/${opportunityId}/`)
+      .then((response) => response?.data)
+      .catch((error) => {
+        throw error?.response?.data;
+      });
+  }
+
+  async updateClientNote(
+    workspaceSlug: string,
+    clientId: string,
+    noteId: string,
+    data: Partial<TClientNote>
+  ): Promise<TClientNote> {
+    return this.patch(`/api/workspaces/${workspaceSlug}/intranet/clients/${clientId}/notes/${noteId}/`, data)
       .then((response) => response?.data)
       .catch((error) => {
         throw error?.response?.data;

@@ -119,6 +119,11 @@ export const coreRoutes: RouteConfigEntry[] = [
           route(":workspaceSlug/worklogs", "./(all)/[workspaceSlug]/(projects)/worklogs/page.tsx"),
         ]),
 
+        // CRM pipeline
+        layout("./(all)/[workspaceSlug]/(projects)/pipeline/layout.tsx", [
+          route(":workspaceSlug/pipeline", "./(all)/[workspaceSlug]/(projects)/pipeline/page.tsx"),
+        ]),
+
         // Team / org chart
         layout("./(all)/[workspaceSlug]/(projects)/team/layout.tsx", [
           route(":workspaceSlug/team", "./(all)/[workspaceSlug]/(projects)/team/page.tsx"),

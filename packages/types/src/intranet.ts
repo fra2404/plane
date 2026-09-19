@@ -134,6 +134,28 @@ export type TClientNote = {
   kind: TClientNoteKind;
   content: string;
   occurred_at: string;
+  due_date: string | null;
+  is_done: boolean;
+  assignee: string | null;
+  assignee_detail: IUserLite | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type TOpportunityStage = "lead" | "contattato" | "preventivo" | "negoziazione" | "vinto" | "perso";
+
+export type TIntranetOpportunity = {
+  id: string;
+  name: string;
+  client: string | null;
+  client_detail: TIntranetClient | null;
+  stage: TOpportunityStage;
+  value: string | null;
+  expected_close_date: string | null;
+  owner: string | null;
+  owner_detail: IUserLite | null;
+  notes: string;
+  sort_order: number;
   created_at: string;
   updated_at: string;
 };

@@ -11,10 +11,21 @@ from plane.app.views import (
     IntranetDeviceViewSet,
     IntranetLinkViewSet,
     IntranetNewsViewSet,
+    IntranetOpportunityViewSet,
     ProjectUsefulLinkViewSet,
 )
 
 urlpatterns = [
+    path(
+        "workspaces/<str:slug>/intranet/opportunities/",
+        IntranetOpportunityViewSet.as_view({"get": "list", "post": "create"}),
+        name="workspace-intranet-opportunities",
+    ),
+    path(
+        "workspaces/<str:slug>/intranet/opportunities/<uuid:pk>/",
+        IntranetOpportunityViewSet.as_view({"patch": "partial_update", "delete": "destroy"}),
+        name="workspace-intranet-opportunity",
+    ),
     path(
         "workspaces/<str:slug>/projects/<uuid:project_id>/useful-links/",
         ProjectUsefulLinkViewSet.as_view({"get": "list", "post": "create"}),
@@ -76,7 +87,7 @@ urlpatterns = [
     ),
     path(
         "workspaces/<str:slug>/intranet/clients/<uuid:client_id>/notes/<uuid:pk>/",
-        ClientNoteViewSet.as_view({"delete": "destroy"}),
+        ClientNoteViewSet.as_view({"patch": "partial_update", "delete": "destroy"}),
         name="intranet-client-note",
     ),
     path(

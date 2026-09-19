@@ -161,6 +161,15 @@ class ClientNote(WorkspaceBaseModel):
     kind = models.CharField(max_length=20, choices=KIND_CHOICES, default="nota")
     content = models.TextField(blank=True, default="")
     occurred_at = models.DateTimeField(default=timezone.now)
+    due_date = models.DateField(null=True, blank=True)
+    is_done = models.BooleanField(default=False)
+    assignee = models.ForeignKey(
+        "db.User",
+        on_delete=models.SET_NULL,
+        related_name="client_activities",
+        null=True,
+        blank=True,
+    )
 
     class Meta:
         verbose_name = "Client Note"
@@ -171,3 +180,47 @@ class ClientNote(WorkspaceBaseModel):
 
     def __str__(self):
         return f"{self.client_id} {self.kind}"
+
+
+class IntranetOpportunity(WorkspaceBaseModel):
+    """Sales opportunity / deal for the CRM pipeline."""
+
+    STAGE_CHOICES = (
+        ("lead", "Lead"),
+        ("contattato", "Contattato"),
+        ("preventivo", "Preventivo"),
+        ("negoziazione", "Negoziazione"),
+        ("vinto", "Vinto"),
+        ("perso", "Perso"),
+    )
+
+    name = models.CharField(max_length=255)
+    client = models.ForeignKey(
+        "db.IntranetClient",
+        on_delete=models.SET_NULL,
+        related_name="opportunities",
+        null=True,
+        blank=True,
+    )
+    stage = models.CharField(max_length=20, choices=STAGE_CHOICES, default="lead")
+    value = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    expected_close_date = models.DateField(null=True, blank=True)
+    owner = models.ForeignKey(
+        "db.User",
+        on_delete=models.SET_NULL,
+        related_name="owned_opportunities",
+        null=True,
+        blank=True,
+    )
+    notes = models.TextField(blank=True, default="")
+    sort_order = models.FloatField(default=65535)
+
+    class Meta:
+        verbose_name = "Intranet Opportunity"
+        verbose_name_plural = "Intranet Opportunities"
+        db_table = "intranet_opportunities"
+        ordering = ("stage", "sort_order", "-created_at")
+        indexes = [models.Index(fields=["workspace", "stage"], name="intranet_opp_ws_stage_idx")]
+
+    def __str__(self):
+        return f"{self.name} ({self.stage})"

@@ -16,7 +16,7 @@ import {
   ViewsIcon,
   YourWorkIcon,
 } from "@plane/propel/icons";
-import { Network, Timer, Users } from "lucide-react";
+import { Network, Timer, TrendingUp, Users } from "lucide-react";
 import { cn } from "@plane/utils";
 
 export const getSidebarNavigationItemIcon = (key: string, className: string = "") => {
@@ -47,5 +47,7 @@ export const getSidebarNavigationItemIcon = (key: string, className: string = ""
       return <Timer className={cn("size-4 flex-shrink-0", className)} />;
     case "team":
       return <Users className={cn("size-4 flex-shrink-0", className)} />;
+    case "pipeline":
+      return <TrendingUp className={cn("size-4 flex-shrink-0", className)} />;
   }
 };

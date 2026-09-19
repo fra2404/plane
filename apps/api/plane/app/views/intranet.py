@@ -12,6 +12,7 @@ from plane.app.permissions import ROLE, allow_permission
 from plane.app.serializers import (
     ClientNoteSerializer,
     IntranetClientSerializer,
+    IntranetOpportunitySerializer,
     IntranetContactSerializer,
     IntranetDeviceSerializer,
     IntranetLinkSerializer,
@@ -24,6 +25,7 @@ from plane.db.models import (
     IntranetDevice,
     IntranetLink,
     IntranetNews,
+    IntranetOpportunity,
     IssueWorklog,
     Project,
     Workspace,
@@ -373,9 +375,71 @@ class ClientNoteViewSet(BaseViewSet):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER], level="WORKSPACE")
+    def partial_update(self, request, slug, client_id, pk):
+        note = self.get_queryset().filter(pk=pk).first()
+        if not note:
+            return Response({"error": "Not found."}, status=status.HTTP_404_NOT_FOUND)
+        serializer = ClientNoteSerializer(note, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save(updated_by=request.user)
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    @allow_permission([ROLE.ADMIN, ROLE.MEMBER], level="WORKSPACE")
     def destroy(self, request, slug, client_id, pk):
         note = self.get_queryset().filter(pk=pk).first()
         if not note:
             return Response({"error": "Not found."}, status=status.HTTP_404_NOT_FOUND)
         note.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class IntranetOpportunityViewSet(BaseViewSet):
+    """CRM pipeline opportunities."""
+
+    model = IntranetOpportunity
+    serializer_class = IntranetOpportunitySerializer
+
+    def get_queryset(self):
+        return IntranetOpportunity.objects.filter(workspace__slug=self.kwargs.get("slug")).select_related(
+            "client", "owner"
+        )
+
+    @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST], level="WORKSPACE")
+    def list(self, request, slug):
+        queryset = self.get_queryset()
+        stage = request.GET.get("stage")
+        if stage:
+            queryset = queryset.filter(stage=stage)
+        client_id = request.GET.get("client_id")
+        if client_id:
+            queryset = queryset.filter(client_id=client_id)
+        return Response(IntranetOpportunitySerializer(queryset, many=True).data)
+
+    @allow_permission([ROLE.ADMIN, ROLE.MEMBER], level="WORKSPACE")
+    def create(self, request, slug):
+        workspace = Workspace.objects.get(slug=slug)
+        serializer = IntranetOpportunitySerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save(workspace=workspace, created_by=request.user)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    @allow_permission([ROLE.ADMIN, ROLE.MEMBER], level="WORKSPACE")
+    def partial_update(self, request, slug, pk):
+        obj = self.get_queryset().filter(pk=pk).first()
+        if not obj:
+            return Response({"error": "Not found."}, status=status.HTTP_404_NOT_FOUND)
+        serializer = IntranetOpportunitySerializer(obj, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save(updated_by=request.user)
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    @allow_permission([ROLE.ADMIN, ROLE.MEMBER], level="WORKSPACE")
+    def destroy(self, request, slug, pk):
+        obj = self.get_queryset().filter(pk=pk).first()
+        if not obj:
+            return Response({"error": "Not found."}, status=status.HTTP_404_NOT_FOUND)
+        obj.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)

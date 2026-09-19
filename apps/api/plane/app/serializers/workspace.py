@@ -10,6 +10,8 @@ from .base import BaseSerializer, DynamicBaseSerializer
 from .user import UserLiteSerializer, UserAdminLiteSerializer
 
 
+from django.db.models import Sum
+
 from plane.db.models import (
     Workspace,
     WorkspaceMember,
@@ -19,6 +21,7 @@ from plane.db.models import (
     WorkspaceUserLink,
     UserRecentVisit,
     Issue,
+    IssueWorklog,
     Page,
     Project,
     ProjectMember,
@@ -234,6 +237,7 @@ class WorkspaceUserLinkSerializer(BaseSerializer):
 class IssueRecentVisitSerializer(serializers.ModelSerializer):
     project_identifier = serializers.SerializerMethodField()
     assignees = serializers.SerializerMethodField()
+    total_logged_time = serializers.SerializerMethodField()
 
     class Meta:
         model = Issue
@@ -247,7 +251,11 @@ class IssueRecentVisitSerializer(serializers.ModelSerializer):
             "sequence_id",
             "project_id",
             "project_identifier",
+            "total_logged_time",
         ]
+
+    def get_total_logged_time(self, obj):
+        return IssueWorklog.objects.filter(issue_id=obj.id).aggregate(total=Sum("duration"))["total"] or 0
 
     def get_project_identifier(self, obj):
         project = obj.project

@@ -6,7 +6,15 @@ from rest_framework import serializers
 
 from plane.app.serializers.base import BaseSerializer
 from plane.app.serializers.user import UserLiteSerializer
-from plane.db.models import ClientNote, IntranetClient, IntranetContact, IntranetDevice, IntranetLink, IntranetNews
+from plane.db.models import (
+    ClientNote,
+    IntranetClient,
+    IntranetContact,
+    IntranetDevice,
+    IntranetLink,
+    IntranetNews,
+    IntranetOpportunity,
+)
 
 
 class IntranetDeviceSerializer(BaseSerializer):
@@ -168,6 +176,7 @@ class IntranetContactSerializer(BaseSerializer):
 
 class ClientNoteSerializer(BaseSerializer):
     author_detail = UserLiteSerializer(read_only=True, source="author")
+    assignee_detail = UserLiteSerializer(read_only=True, source="assignee")
 
     class Meta:
         model = ClientNote
@@ -180,9 +189,40 @@ class ClientNoteSerializer(BaseSerializer):
             "kind",
             "content",
             "occurred_at",
+            "due_date",
+            "is_done",
+            "assignee",
+            "assignee_detail",
             "created_at",
             "updated_at",
             "created_by",
             "updated_by",
         ]
         read_only_fields = ["id", "workspace", "author", "created_at", "updated_at", "created_by", "updated_by"]
+
+
+class IntranetOpportunitySerializer(BaseSerializer):
+    client_detail = IntranetClientSerializer(read_only=True, source="client")
+    owner_detail = UserLiteSerializer(read_only=True, source="owner")
+
+    class Meta:
+        model = IntranetOpportunity
+        fields = [
+            "id",
+            "workspace",
+            "name",
+            "client",
+            "client_detail",
+            "stage",
+            "value",
+            "expected_close_date",
+            "owner",
+            "owner_detail",
+            "notes",
+            "sort_order",
+            "created_at",
+            "updated_at",
+            "created_by",
+            "updated_by",
+        ]
+        read_only_fields = ["id", "workspace", "created_at", "updated_at", "created_by", "updated_by"]

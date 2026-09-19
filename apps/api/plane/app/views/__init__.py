@@ -153,6 +153,7 @@ from .intranet import (
     IntranetDeviceViewSet,
     IntranetLinkViewSet,
     IntranetNewsViewSet,
+    IntranetOpportunityViewSet,
     ProjectUsefulLinkViewSet,
 )
 from .anniversary import WorkspaceAnniversaryEndpoint

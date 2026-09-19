@@ -19,11 +19,13 @@ import { formatWorklogDuration } from "@plane/utils";
 import { PageHead } from "@/components/core/page-title";
 // services
 import { IntranetService } from "@/services/intranet.service";
+import { TeamService } from "@/services/team.service";
 // hooks
 import { useProject } from "@/hooks/store/use-project";
 import { useUserPermissions } from "@/hooks/store/user";
 
 const intranetService = new IntranetService();
+const teamService = new TeamService();
 
 const NOTE_KINDS: { key: TClientNoteKind; label: string }[] = [
   { key: "nota", label: "Nota" },
@@ -52,6 +54,9 @@ const ClientDetailPage = observer(function ClientDetailPage() {
   const [noteContent, setNoteContent] = useState("");
   const [noteDate, setNoteDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [addingProject, setAddingProject] = useState("");
+  const [noteDue, setNoteDue] = useState("");
+  const [noteAssignee, setNoteAssignee] = useState("");
+  const [members, setMembers] = useState<{ id: string; name: string }[]>([]);
 
   const load = useCallback(async () => {
     if (!ws || !cid) return;
@@ -59,6 +64,13 @@ const ClientDetailPage = observer(function ClientDetailPage() {
     setHasError(false);
     try {
       setDetail(await intranetService.getClient(ws, cid));
+      const team = await teamService.listTeam(ws);
+      setMembers(
+        (team ?? []).map((member) => ({
+          id: member.user_id,
+          name: member.user_detail?.display_name ?? member.user_id,
+        }))
+      );
     } catch {
       setHasError(true);
     } finally {
@@ -129,13 +141,27 @@ const ClientDetailPage = observer(function ClientDetailPage() {
         kind: noteKind,
         content: noteContent,
         occurred_at: `${noteDate}T12:00:00Z`,
+        due_date: noteDue || null,
+        assignee: noteAssignee || null,
       });
       setNoteContent("");
+      setNoteDue("");
+      setNoteAssignee("");
       await load();
     } catch {
       setToast({ type: TOAST_TYPE.ERROR, title: "Errore", message: "Nota non salvata." });
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const toggleNoteDone = async (note: TClientNote) => {
+    if (!ws || !cid) return;
+    try {
+      await intranetService.updateClientNote(ws, cid, note.id, { is_done: !note.is_done });
+      await load();
+    } catch {
+      setToast({ type: TOAST_TYPE.ERROR, title: "Errore", message: "Aggiornamento non riuscito." });
     }
   };
 
@@ -383,6 +409,25 @@ const ClientDetailPage = observer(function ClientDetailPage() {
                       onChange={(event) => setNoteDate(event.target.value)}
                       className="rounded-md border border-subtle bg-surface-1 px-2.5 py-1.5 text-body-sm-regular text-primary outline-none"
                     />
+                    <input
+                      type="date"
+                      value={noteDue}
+                      onChange={(event) => setNoteDue(event.target.value)}
+                      title="Scadenza attività"
+                      className="rounded-md border border-subtle bg-surface-1 px-2.5 py-1.5 text-body-sm-regular text-primary outline-none"
+                    />
+                    <select
+                      value={noteAssignee}
+                      onChange={(event) => setNoteAssignee(event.target.value)}
+                      className="rounded-md border border-subtle bg-surface-1 px-2.5 py-1.5 text-body-sm-regular text-primary outline-none"
+                    >
+                      <option value="">Nessun assegnatario</option>
+                      {members.map((member) => (
+                        <option key={member.id} value={member.id}>
+                          {member.name}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                   <TextArea
                     placeholder="Aggiungi una nota (interazione, chiamata, follow-up…)"
@@ -412,6 +457,16 @@ const ClientDetailPage = observer(function ClientDetailPage() {
                             {new Date(note.occurred_at).toLocaleDateString()}
                             <span className="rounded border border-subtle px-1.5 py-0.5 uppercase">{note.kind}</span>
                             <span>{note.author_detail?.display_name ?? ""}</span>
+                            {note.due_date && <span>scad. {note.due_date}</span>}
+                            {note.assignee_detail && <span>{note.assignee_detail.display_name}</span>}
+                            <label className="flex items-center gap-1">
+                              <input
+                                type="checkbox"
+                                checked={note.is_done}
+                                onChange={() => void toggleNoteDone(note)}
+                              />
+                              fatto
+                            </label>
                           </p>
                           <button
                             type="button"

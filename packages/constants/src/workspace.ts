@@ -285,6 +285,13 @@ export const WORKSPACE_SIDEBAR_STATIC_NAVIGATION_ITEMS: Record<string, IWorkspac
     access: [EUserWorkspaceRoles.ADMIN],
     highlight: (pathname: string, url: string) => pathname.includes(url),
   },
+  pipeline: {
+    key: "pipeline",
+    labelTranslationKey: "sidebar.pipeline",
+    href: `/pipeline/`,
+    access: [EUserWorkspaceRoles.ADMIN, EUserWorkspaceRoles.MEMBER, EUserWorkspaceRoles.GUEST],
+    highlight: (pathname: string, url: string) => pathname.includes(url),
+  },
   team: {
     key: "team",
     labelTranslationKey: "sidebar.org_chart",
@@ -296,6 +303,7 @@ export const WORKSPACE_SIDEBAR_STATIC_NAVIGATION_ITEMS: Record<string, IWorkspac
 
 export const WORKSPACE_SIDEBAR_STATIC_NAVIGATION_ITEMS_LINKS: IWorkspaceSidebarNavigationItem[] = [
   WORKSPACE_SIDEBAR_STATIC_NAVIGATION_ITEMS["home"],
+  WORKSPACE_SIDEBAR_STATIC_NAVIGATION_ITEMS["pipeline"],
   WORKSPACE_SIDEBAR_STATIC_NAVIGATION_ITEMS["team"],
   WORKSPACE_SIDEBAR_STATIC_NAVIGATION_ITEMS["worklogs"],
 ];
