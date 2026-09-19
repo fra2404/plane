@@ -33,6 +33,7 @@ from plane.db.models import (
     IssueWorklog,
     Project,
     Workspace,
+    WorkspaceMember,
     WorklogPayment,
 )
 
