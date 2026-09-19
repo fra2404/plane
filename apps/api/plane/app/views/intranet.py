@@ -10,6 +10,7 @@ from rest_framework import status
 from rest_framework.response import Response
 
 from plane.app.permissions import ROLE, allow_permission
+from plane.utils.permissions import WorkspaceEntityPermission
 from plane.app.serializers import (
     ClientNoteSerializer,
     IntranetClientSerializer,
