@@ -168,10 +168,41 @@ export type TIntranetClientProject = {
   budget_months: Record<string, number>;
 };
 
+export type TQuoteStatus = "bozza" | "inviato" | "accettato" | "rifiutato" | "scaduto";
+
+export type TIntranetQuote = {
+  id: string;
+  title: string;
+  code: string;
+  client: string;
+  client_detail: TIntranetClient | null;
+  opportunity: string | null;
+  status: TQuoteStatus;
+  amount: string;
+  tax_rate: string;
+  total: string;
+  issued_date: string | null;
+  valid_until: string | null;
+  notes: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type TCrmsummary = {
+  pipeline_by_stage: { stage: string; label: string; count: number; value: string }[];
+  pipeline_open_value: string;
+  won_total: string;
+  won_by_month: { month: string; value: string; count: number }[];
+  quotes_by_status: { status: string; label: string; count: number; value: string }[];
+  quotes_total: string;
+  clients: { client_id: string | null; client_name: string; quotes_count: number; quotes_value: string }[];
+};
+
 export type TIntranetClientDetail = TIntranetClient & {
   contacts: TIntranetContact[];
   projects: TIntranetClientProject[];
   total_logged_time: number;
   total_paid_amount: string;
   timeline: TClientNote[];
+  quotes?: TIntranetQuote[];
 };

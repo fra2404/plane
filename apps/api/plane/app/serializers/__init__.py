@@ -137,6 +137,7 @@ from .intranet import (
     IntranetLinkSerializer,
     IntranetNewsSerializer,
     IntranetOpportunitySerializer,
+    IntranetQuoteSerializer,
 )
 
 from .webhook import WebhookSerializer, WebhookLogSerializer

@@ -11,11 +11,28 @@ from plane.app.views import (
     IntranetDeviceViewSet,
     IntranetLinkViewSet,
     IntranetNewsViewSet,
+    CRMSummaryEndpoint,
     IntranetOpportunityViewSet,
+    IntranetQuoteViewSet,
     ProjectUsefulLinkViewSet,
 )
 
 urlpatterns = [
+    path(
+        "workspaces/<str:slug>/intranet/quotes/",
+        IntranetQuoteViewSet.as_view({"get": "list", "post": "create"}),
+        name="workspace-intranet-quotes",
+    ),
+    path(
+        "workspaces/<str:slug>/intranet/quotes/<uuid:pk>/",
+        IntranetQuoteViewSet.as_view({"patch": "partial_update", "delete": "destroy"}),
+        name="workspace-intranet-quote",
+    ),
+    path(
+        "workspaces/<str:slug>/crm-summary/",
+        CRMSummaryEndpoint.as_view(),
+        name="workspace-crm-summary",
+    ),
     path(
         "workspaces/<str:slug>/intranet/opportunities/",
         IntranetOpportunityViewSet.as_view({"get": "list", "post": "create"}),

@@ -9,15 +9,19 @@ import { observer } from "mobx-react";
 import { useParams } from "next/navigation";
 import { Pencil, Plus, Trash2 } from "lucide-react";
 // plane imports
+import { EUserPermissions, EUserPermissionsLevel } from "@plane/constants";
 import { Button } from "@plane/propel/button";
 import { TOAST_TYPE, setToast } from "@plane/propel/toast";
 import type { TIntranetClient, TIntranetOpportunity, TOpportunityStage } from "@plane/types";
 import { Input, TextArea } from "@plane/ui";
 // components
+import { NotAuthorizedView } from "@/components/auth-screens/not-authorized-view";
 import { PageHead } from "@/components/core/page-title";
 // services
 import { IntranetService } from "@/services/intranet.service";
 import { TeamService } from "@/services/team.service";
+// hooks
+import { useUserPermissions } from "@/hooks/store/user";
 
 const intranetService = new IntranetService();
 const teamService = new TeamService();
@@ -54,6 +58,8 @@ const emptyDraft: TDraft = {
 const PipelinePage = observer(function PipelinePage() {
   const { workspaceSlug } = useParams();
   const ws = workspaceSlug?.toString();
+  const { allowPermissions } = useUserPermissions();
+  const canAdmin = allowPermissions([EUserPermissions.ADMIN], EUserPermissionsLevel.WORKSPACE);
 
   const [opportunities, setOpportunities] = useState<TIntranetOpportunity[]>([]);
   const [clients, setClients] = useState<TIntranetClient[]>([]);
@@ -177,6 +183,8 @@ const PipelinePage = observer(function PipelinePage() {
 
   const formVisible = editingId !== null || draft !== emptyDraft;
   const isDirty = draft.name !== "" || draft.client !== "" || draft.value !== "" || draft.notes !== "";
+
+  if (!canAdmin) return <NotAuthorizedView section="settings" className="h-auto" />;
 
   return (
     <>

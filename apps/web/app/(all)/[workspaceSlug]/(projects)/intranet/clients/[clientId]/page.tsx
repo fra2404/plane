@@ -7,12 +7,19 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { observer } from "mobx-react";
 import { useParams } from "next/navigation";
-import { Building2, Calendar, Mail, MapPin, Phone, Plus, Trash2, User } from "lucide-react";
+import { Building2, Calendar, Mail, MapPin, Pencil, Phone, Plus, Trash2, User } from "lucide-react";
 // plane imports
 import { EUserPermissions, EUserPermissionsLevel } from "@plane/constants";
 import { Button } from "@plane/propel/button";
 import { TOAST_TYPE, setToast } from "@plane/propel/toast";
-import type { TClientNote, TClientNoteKind, TIntranetClientDetail, TIntranetClientStatus } from "@plane/types";
+import type {
+  TClientNote,
+  TClientNoteKind,
+  TIntranetClientDetail,
+  TIntranetClientStatus,
+  TIntranetQuote,
+  TQuoteStatus,
+} from "@plane/types";
 import { Input, TextArea } from "@plane/ui";
 import { formatWorklogDuration } from "@plane/utils";
 // components
@@ -57,6 +64,7 @@ const ClientDetailPage = observer(function ClientDetailPage() {
   const [noteDue, setNoteDue] = useState("");
   const [noteAssignee, setNoteAssignee] = useState("");
   const [members, setMembers] = useState<{ id: string; name: string }[]>([]);
+  const [quoteForm, setQuoteForm] = useState<Partial<TIntranetQuote> | null>(null);
 
   const load = useCallback(async () => {
     if (!ws || !cid) return;
@@ -176,6 +184,42 @@ const ClientDetailPage = observer(function ClientDetailPage() {
   };
 
   const canEditClient = canAdmin;
+
+  const saveQuote = async () => {
+    if (!ws || !cid || !quoteForm?.title?.trim() || quoteForm.amount === undefined) return;
+    setIsSaving(true);
+    try {
+      const payload = {
+        title: quoteForm.title,
+        code: quoteForm.code ?? "",
+        client: cid,
+        status: (quoteForm.status ?? "bozza") as TQuoteStatus,
+        amount: String(quoteForm.amount ?? "0"),
+        tax_rate: String(quoteForm.tax_rate ?? "22"),
+        issued_date: quoteForm.issued_date || null,
+        valid_until: quoteForm.valid_until || null,
+        notes: quoteForm.notes ?? "",
+      };
+      if (quoteForm.id) await intranetService.updateQuote(ws, quoteForm.id, payload);
+      else await intranetService.createQuote(ws, payload);
+      setQuoteForm(null);
+      await load();
+    } catch {
+      setToast({ type: TOAST_TYPE.ERROR, title: "Errore", message: "Preventivo non salvato." });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const removeQuote = async (quote: TIntranetQuote) => {
+    if (!ws) return;
+    try {
+      await intranetService.deleteQuote(ws, quote.id);
+      await load();
+    } catch {
+      setToast({ type: TOAST_TYPE.ERROR, title: "Errore", message: "Eliminazione non riuscita." });
+    }
+  };
 
   return (
     <>
@@ -363,6 +407,137 @@ const ClientDetailPage = observer(function ClientDetailPage() {
                 </div>
               )}
             </div>
+
+            {canAdmin && (
+              <div>
+                <div className="flex items-center justify-between pb-2">
+                  <h5 className="text-body-sm-medium text-secondary">Preventivi</h5>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => setQuoteForm({ status: "bozza", tax_rate: "22", amount: "0" })}
+                  >
+                    <span className="flex items-center gap-1">
+                      <Plus className="size-3.5" /> Nuovo preventivo
+                    </span>
+                  </Button>
+                </div>
+                {quoteForm && (
+                  <div className="mb-3 grid grid-cols-1 gap-2 rounded-md border border-subtle p-3 md:grid-cols-3">
+                    <Input
+                      placeholder="Titolo *"
+                      value={quoteForm.title ?? ""}
+                      onChange={(event) => setQuoteForm({ ...quoteForm, title: event.target.value })}
+                    />
+                    <Input
+                      placeholder="Codice (es. PREV-2026-001)"
+                      value={quoteForm.code ?? ""}
+                      onChange={(event) => setQuoteForm({ ...quoteForm, code: event.target.value })}
+                    />
+                    <select
+                      value={quoteForm.status ?? "bozza"}
+                      onChange={(event) => setQuoteForm({ ...quoteForm, status: event.target.value as TQuoteStatus })}
+                      className="rounded-md border border-subtle bg-surface-1 px-2.5 py-1.5 text-body-sm-regular text-primary outline-none"
+                    >
+                      <option value="bozza">Bozza</option>
+                      <option value="inviato">Inviato</option>
+                      <option value="accettato">Accettato</option>
+                      <option value="rifiutato">Rifiutato</option>
+                      <option value="scaduto">Scaduto</option>
+                    </select>
+                    <Input
+                      placeholder="Importo netto €"
+                      type="number"
+                      step="0.01"
+                      value={quoteForm.amount ?? ""}
+                      onChange={(event) => setQuoteForm({ ...quoteForm, amount: event.target.value })}
+                    />
+                    <Input
+                      placeholder="IVA %"
+                      type="number"
+                      step="0.01"
+                      value={quoteForm.tax_rate ?? ""}
+                      onChange={(event) => setQuoteForm({ ...quoteForm, tax_rate: event.target.value })}
+                    />
+                    <Input
+                      type="date"
+                      value={quoteForm.issued_date ?? ""}
+                      onChange={(event) => setQuoteForm({ ...quoteForm, issued_date: event.target.value })}
+                    />
+                    <Input
+                      type="date"
+                      value={quoteForm.valid_until ?? ""}
+                      onChange={(event) => setQuoteForm({ ...quoteForm, valid_until: event.target.value })}
+                    />
+                    <TextArea
+                      placeholder="Note"
+                      value={quoteForm.notes ?? ""}
+                      onChange={(event) => setQuoteForm({ ...quoteForm, notes: event.target.value })}
+                      className="md:col-span-3"
+                      rows={2}
+                    />
+                    <div className="flex gap-2 md:col-span-3">
+                      <Button variant="primary" size="sm" onClick={saveQuote} loading={isSaving}>
+                        Salva
+                      </Button>
+                      <Button variant="secondary" size="sm" onClick={() => setQuoteForm(null)}>
+                        Annulla
+                      </Button>
+                    </div>
+                  </div>
+                )}
+                {(detail.quotes ?? []).length === 0 ? (
+                  <p className="py-2 text-body-sm-regular text-tertiary">Nessun preventivo.</p>
+                ) : (
+                  <div className="overflow-hidden rounded-md border border-subtle">
+                    <table className="w-full table-auto text-left text-body-sm-regular">
+                      <thead className="bg-surface-2 text-tertiary">
+                        <tr>
+                          <th className="px-3 py-2 font-medium">Titolo</th>
+                          <th className="px-3 py-2 font-medium">Stato</th>
+                          <th className="px-3 py-2 text-right font-medium">Netto €</th>
+                          <th className="px-3 py-2 text-right font-medium">Totale €</th>
+                          <th className="px-3 py-2" />
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {(detail.quotes ?? []).map((quote) => (
+                          <tr key={quote.id} className="border-t border-subtle">
+                            <td className="px-3 py-2 text-primary">
+                              {quote.title}
+                              {quote.code && <span className="ml-1 text-tertiary">({quote.code})</span>}
+                            </td>
+                            <td className="px-3 py-2 text-secondary uppercase">{quote.status}</td>
+                            <td className="px-3 py-2 text-right text-secondary">{Number(quote.amount).toFixed(2)}</td>
+                            <td className="px-3 py-2 text-right font-medium text-primary">
+                              {Number(quote.total).toFixed(2)}
+                            </td>
+                            <td className="px-3 py-2 text-right">
+                              <div className="flex items-center justify-end gap-1">
+                                <button
+                                  type="button"
+                                  className="rounded p-1 text-tertiary hover:text-primary"
+                                  onClick={() => setQuoteForm({ ...quote })}
+                                >
+                                  <Pencil className="size-3.5" />
+                                </button>
+                                <button
+                                  type="button"
+                                  className="rounded p-1 text-tertiary hover:text-danger-primary"
+                                  onClick={() => void removeQuote(quote)}
+                                >
+                                  <Trash2 className="size-3.5" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            )}
 
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
               <div>

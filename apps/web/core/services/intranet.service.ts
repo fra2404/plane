@@ -14,6 +14,8 @@ import type {
   TIntranetLink,
   TIntranetNews,
   TIntranetOpportunity,
+  TIntranetQuote,
+  TCrmsummary,
 } from "@plane/types";
 // services
 import { APIService } from "@/services/api.service";
@@ -243,6 +245,48 @@ export class IntranetService extends APIService {
     data: Partial<TIntranetOpportunity>
   ): Promise<TIntranetOpportunity> {
     return this.patch(`/api/workspaces/${workspaceSlug}/intranet/opportunities/${opportunityId}/`, data)
+      .then((response) => response?.data)
+      .catch((error) => {
+        throw error?.response?.data;
+      });
+  }
+
+  async listQuotes(workspaceSlug: string, clientId?: string): Promise<TIntranetQuote[]> {
+    return this.get(`/api/workspaces/${workspaceSlug}/intranet/quotes/`, {
+      params: clientId ? { client_id: clientId } : undefined,
+    })
+      .then((response) => response?.data)
+      .catch((error) => {
+        throw error?.response?.data;
+      });
+  }
+
+  async createQuote(workspaceSlug: string, data: Partial<TIntranetQuote>): Promise<TIntranetQuote> {
+    return this.post(`/api/workspaces/${workspaceSlug}/intranet/quotes/`, data)
+      .then((response) => response?.data)
+      .catch((error) => {
+        throw error?.response?.data;
+      });
+  }
+
+  async updateQuote(workspaceSlug: string, quoteId: string, data: Partial<TIntranetQuote>): Promise<TIntranetQuote> {
+    return this.patch(`/api/workspaces/${workspaceSlug}/intranet/quotes/${quoteId}/`, data)
+      .then((response) => response?.data)
+      .catch((error) => {
+        throw error?.response?.data;
+      });
+  }
+
+  async deleteQuote(workspaceSlug: string, quoteId: string): Promise<void> {
+    return this.delete(`/api/workspaces/${workspaceSlug}/intranet/quotes/${quoteId}/`)
+      .then((response) => response?.data)
+      .catch((error) => {
+        throw error?.response?.data;
+      });
+  }
+
+  async fetchCrmSummary(workspaceSlug: string): Promise<TCrmsummary> {
+    return this.get(`/api/workspaces/${workspaceSlug}/crm-summary/`)
       .then((response) => response?.data)
       .catch((error) => {
         throw error?.response?.data;

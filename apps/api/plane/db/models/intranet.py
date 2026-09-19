@@ -224,3 +224,46 @@ class IntranetOpportunity(WorkspaceBaseModel):
 
     def __str__(self):
         return f"{self.name} ({self.stage})"
+
+
+class IntranetQuote(WorkspaceBaseModel):
+    """Quote / preventivo for a client."""
+
+    STATUS_CHOICES = (
+        ("bozza", "Bozza"),
+        ("inviato", "Inviato"),
+        ("accettato", "Accettato"),
+        ("rifiutato", "Rifiutato"),
+        ("scaduto", "Scaduto"),
+    )
+
+    title = models.CharField(max_length=255)
+    code = models.CharField(max_length=64, blank=True, default="")
+    client = models.ForeignKey(
+        "db.IntranetClient",
+        on_delete=models.CASCADE,
+        related_name="quotes",
+    )
+    opportunity = models.ForeignKey(
+        "db.IntranetOpportunity",
+        on_delete=models.SET_NULL,
+        related_name="quotes",
+        null=True,
+        blank=True,
+    )
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="bozza")
+    amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    tax_rate = models.DecimalField(max_digits=5, decimal_places=2, default=22)
+    issued_date = models.DateField(null=True, blank=True)
+    valid_until = models.DateField(null=True, blank=True)
+    notes = models.TextField(blank=True, default="")
+
+    class Meta:
+        verbose_name = "Intranet Quote"
+        verbose_name_plural = "Intranet Quotes"
+        db_table = "intranet_quotes"
+        ordering = ("-issued_date", "-created_at")
+        indexes = [models.Index(fields=["workspace", "status"], name="intranet_quote_ws_status_idx")]
+
+    def __str__(self):
+        return f"{self.title} ({self.status})"

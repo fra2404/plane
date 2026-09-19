@@ -74,6 +74,7 @@ from .intranet import (
     IntranetLink,
     IntranetNews,
     IntranetOpportunity,
+    IntranetQuote,
 )
 from .team import WorkspaceTeamMember
 from .workspace import (

@@ -2,6 +2,8 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # See the LICENSE file for details.
 
+from decimal import Decimal
+
 from rest_framework import serializers
 
 from plane.app.serializers.base import BaseSerializer
@@ -14,6 +16,7 @@ from plane.db.models import (
     IntranetLink,
     IntranetNews,
     IntranetOpportunity,
+    IntranetQuote,
 )
 
 
@@ -226,3 +229,37 @@ class IntranetOpportunitySerializer(BaseSerializer):
             "updated_by",
         ]
         read_only_fields = ["id", "workspace", "created_at", "updated_at", "created_by", "updated_by"]
+
+
+class IntranetQuoteSerializer(BaseSerializer):
+    client_detail = IntranetClientSerializer(read_only=True, source="client")
+    total = serializers.SerializerMethodField()
+
+    class Meta:
+        model = IntranetQuote
+        fields = [
+            "id",
+            "workspace",
+            "title",
+            "code",
+            "client",
+            "client_detail",
+            "opportunity",
+            "status",
+            "amount",
+            "tax_rate",
+            "total",
+            "issued_date",
+            "valid_until",
+            "notes",
+            "created_at",
+            "updated_at",
+            "created_by",
+            "updated_by",
+        ]
+        read_only_fields = ["id", "workspace", "created_at", "updated_at", "created_by", "updated_by"]
+
+    def get_total(self, obj):
+        amount = obj.amount or 0
+        tax_rate = obj.tax_rate or 0
+        return str((amount * (1 + tax_rate / 100)).quantize(Decimal("0.01")))

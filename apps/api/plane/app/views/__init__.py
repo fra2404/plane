@@ -147,6 +147,7 @@ from .issue.worklog import (
     WorklogPaymentViewSet,
 )
 from .intranet import (
+    CRMSummaryEndpoint,
     ClientNoteViewSet,
     IntranetClientViewSet,
     IntranetContactViewSet,
@@ -154,6 +155,7 @@ from .intranet import (
     IntranetLinkViewSet,
     IntranetNewsViewSet,
     IntranetOpportunityViewSet,
+    IntranetQuoteViewSet,
     ProjectUsefulLinkViewSet,
 )
 from .anniversary import WorkspaceAnniversaryEndpoint
