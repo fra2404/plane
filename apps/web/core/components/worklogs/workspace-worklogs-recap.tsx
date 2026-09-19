@@ -22,6 +22,7 @@ import { formatWorklogDuration } from "@plane/utils";
 import { NotAuthorizedView } from "@/components/auth-screens/not-authorized-view";
 import { PageHead } from "@/components/core/page-title";
 // services
+import { IntranetService } from "@/services/intranet.service";
 import { IssueService } from "@/services/issue";
 // hooks
 import { useUserPermissions } from "@/hooks/store/user";
@@ -29,6 +30,7 @@ import { useProject } from "@/hooks/store/use-project";
 import { useWorkspace } from "@/hooks/store/use-workspace";
 
 const issueService = new IssueService();
+const intranetService = new IntranetService();
 
 const monthEnd = (month: string) => {
   const [year, monthNumber] = month.split("-").map(Number);
@@ -60,7 +62,7 @@ export const WorkspaceWorklogsRecap = observer(function WorkspaceWorklogsRecap()
   const { t } = useTranslation();
   const { currentWorkspace } = useWorkspace();
   const { workspaceUserInfo, allowPermissions } = useUserPermissions();
-  const { updateProject } = useProject();
+  const { updateProject, getProjectById } = useProject();
 
   const [overview, setOverview] = useState<TWorkspaceWorklogSummary | null>(null);
   const [summary, setSummary] = useState<TWorkspaceWorklogSummary | null>(null);
@@ -81,6 +83,7 @@ export const WorkspaceWorklogsRecap = observer(function WorkspaceWorklogsRecap()
     date_from: string;
     date_to: string;
   }>({ actor_id: "", project_id: "", date_from: "", date_to: "" });
+  const [clients, setClients] = useState<{ id: string; name: string }[]>([]);
   const [logSort, setLogSort] = useState<{
     key: "logged_at" | "actor" | "project" | "issue" | "duration";
     dir: "asc" | "desc";
@@ -235,6 +238,12 @@ export const WorkspaceWorklogsRecap = observer(function WorkspaceWorklogsRecap()
       try {
         const response = await issueService.fetchWorkspaceWorklogSummary(workspaceSlug);
         if (isActive) setOverview(response);
+        try {
+          const clientData = await intranetService.listClients(workspaceSlug);
+          if (isActive) setClients((clientData ?? []).map((c) => ({ id: c.id, name: c.name })));
+        } catch {
+          // clients are best-effort
+        }
       } catch {
         // overview is best-effort
       }
@@ -305,6 +314,17 @@ export const WorkspaceWorklogsRecap = observer(function WorkspaceWorklogsRecap()
   const userTotals = summary?.user_totals ?? [];
   const rows = summary?.results ?? [];
   const months = overview?.monthly_totals ?? summary?.monthly_totals ?? [];
+  const projectClientId = (projectId: string) => getProjectById(projectId)?.client ?? "";
+
+  const assignClient = async (projectId: string, clientId: string) => {
+    if (!workspaceSlug) return;
+    try {
+      await updateProject(workspaceSlug, projectId, { client: clientId || null });
+    } catch {
+      // ignore
+    }
+  };
+
   const sortedLogEntries = useMemo(() => {
     // oxlint-disable-next-line unicorn/no-array-sort
     return [...logEntries].sort((a, b) => {
@@ -802,6 +822,7 @@ export const WorkspaceWorklogsRecap = observer(function WorkspaceWorklogsRecap()
                     <thead className="bg-surface-2 text-tertiary">
                       <tr>
                         <th className="px-3 py-2 font-medium">Progetto</th>
+                        <th className="px-3 py-2 font-medium">Cliente</th>
                         <th className="px-3 py-2 text-right font-medium">Budget gen. (h)</th>
                         {selectedMonth !== "all" && (
                           <th className="px-3 py-2 text-right font-medium">Budget mese (h)</th>
@@ -826,6 +847,20 @@ export const WorkspaceWorklogsRecap = observer(function WorkspaceWorklogsRecap()
                         return (
                           <tr key={projectId} className="border-t border-subtle">
                             <td className="px-3 py-2 text-primary">{item.project_name}</td>
+                            <td className="px-3 py-2">
+                              <select
+                                value={projectClientId(projectId)}
+                                onChange={(event) => void assignClient(projectId, event.target.value)}
+                                className="rounded border border-subtle bg-surface-1 px-2 py-1 text-body-sm-regular text-primary outline-none"
+                              >
+                                <option value="">—</option>
+                                {clients.map((client) => (
+                                  <option key={client.id} value={client.id}>
+                                    {client.name}
+                                  </option>
+                                ))}
+                              </select>
+                            </td>
                             <td className="px-3 py-2 text-right">
                               <input
                                 type="number"

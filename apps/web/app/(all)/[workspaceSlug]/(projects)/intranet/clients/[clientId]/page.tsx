@@ -356,30 +356,32 @@ const ClientDetailPage = observer(function ClientDetailPage() {
 
             <div>
               <h5 className="pb-2 text-body-sm-medium text-secondary">Progetti collegati</h5>
-              <div className="flex flex-wrap items-center gap-2 pb-3">
-                <select
-                  value={addingProject}
-                  onChange={(event) => setAddingProject(event.target.value)}
-                  className="min-w-56 rounded-md border border-subtle bg-surface-1 px-2.5 py-1.5 text-body-sm-regular text-primary outline-none"
-                >
-                  <option value="">Collega un progetto…</option>
-                  {availableProjects.map((projectId) => (
-                    <option key={projectId} value={projectId}>
-                      {getProjectById(projectId)?.name ?? projectId}
-                    </option>
-                  ))}
-                </select>
-                <Button
-                  variant="primary"
-                  size="sm"
-                  disabled={!addingProject}
-                  onClick={() => void linkProject(addingProject)}
-                >
-                  <span className="flex items-center gap-1">
-                    <Plus className="size-3.5" /> Collega
-                  </span>
-                </Button>
-              </div>
+              {canAdmin && (
+                <div className="flex flex-wrap items-center gap-2 pb-3">
+                  <select
+                    value={addingProject}
+                    onChange={(event) => setAddingProject(event.target.value)}
+                    className="min-w-56 rounded-md border border-subtle bg-surface-1 px-2.5 py-1.5 text-body-sm-regular text-primary outline-none"
+                  >
+                    <option value="">Collega un progetto…</option>
+                    {availableProjects.map((projectId) => (
+                      <option key={projectId} value={projectId}>
+                        {getProjectById(projectId)?.name ?? projectId}
+                      </option>
+                    ))}
+                  </select>
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    disabled={!addingProject}
+                    onClick={() => void linkProject(addingProject)}
+                  >
+                    <span className="flex items-center gap-1">
+                      <Plus className="size-3.5" /> Collega
+                    </span>
+                  </Button>
+                </div>
+              )}
               {detail.projects.length === 0 ? (
                 <p className="py-2 text-body-sm-regular text-tertiary">Nessun progetto collegato.</p>
               ) : (
@@ -402,13 +404,15 @@ const ClientDetailPage = observer(function ClientDetailPage() {
                             {project.budget_hours != null ? project.budget_hours : "—"}
                           </td>
                           <td className="px-3 py-2 text-right">
-                            <button
-                              type="button"
-                              className="rounded border border-subtle px-2 py-1 text-11 text-danger-primary"
-                              onClick={() => void unlinkProject(project.id)}
-                            >
-                              Scollega
-                            </button>
+                            {canAdmin && (
+                              <button
+                                type="button"
+                                className="rounded border border-subtle px-2 py-1 text-11 text-danger-primary"
+                                onClick={() => void unlinkProject(project.id)}
+                              >
+                                Scollega
+                              </button>
+                            )}
                           </td>
                         </tr>
                       ))}
