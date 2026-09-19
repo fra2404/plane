@@ -366,7 +366,7 @@ class ClientNoteViewSet(BaseViewSet):
         client = IntranetClient.objects.filter(pk=client_id, workspace=workspace).first()
         if not client:
             return Response({"error": "Not found."}, status=status.HTTP_404_NOT_FOUND)
-        serializer = ClientNoteSerializer(data=request.data)
+        serializer = ClientNoteSerializer(data={**request.data, "client": str(client.id)})
         if serializer.is_valid():
             serializer.save(workspace=workspace, client=client, author=request.user, created_by=request.user)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
