@@ -274,11 +274,25 @@ export const handleCoverImageChange = async (
   if (analysis.needsUpload) {
     const assetUrl = await uploadCoverImage(newImage, uploadConfig);
     // cover_image requires an absolute URL; cover_image_url is relative (matches GET /api/users/me/ format)
-    return { cover_image: getFileURL(assetUrl) || assetUrl, cover_image_url: assetUrl };
+    return { cover_image: toAbsoluteCoverURL(assetUrl), cover_image_url: assetUrl };
   }
 
   // cover_image requires an absolute URL; getFileURL converts relative paths from the Upload tab
-  return { cover_image: getFileURL(newImage) || newImage, cover_image_url: newImage };
+  return { cover_image: toAbsoluteCoverURL(newImage), cover_image_url: newImage };
+};
+
+/**
+ * Build an absolute URL for cover images. `cover_image` is validated as a URL
+ * server-side, so when API_BASE_URL is empty (same-origin deploy) we must prefix
+ * the current origin.
+ */
+const toAbsoluteCoverURL = (path: string | null | undefined): string | null => {
+  if (!path) return null;
+  if (path.startsWith("http")) return path;
+  const url = getFileURL(path) || path;
+  if (url.startsWith("http")) return url;
+  if (typeof window === "undefined") return url;
+  return `${window.location.origin}${url.startsWith("/") ? "" : "/"}${url}`;
 };
 
 /**
