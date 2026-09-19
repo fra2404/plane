@@ -85,6 +85,9 @@ export const WorkspaceWorklogsRecap = observer(function WorkspaceWorklogsRecap()
     date_to: string;
   }>({ actor_id: "", project_id: "", date_from: "", date_to: "" });
   const [clients, setClients] = useState<{ id: string; name: string }[]>([]);
+  const [paymentFilter, setPaymentFilter] = useState<"all" | "due" | "paid">("due");
+  const [paymentActorId, setPaymentActorId] = useState("");
+  const [paymentProjectId, setPaymentProjectId] = useState("");
   const [logSort, setLogSort] = useState<{
     key: "logged_at" | "actor" | "project" | "issue" | "duration";
     dir: "asc" | "desc";
@@ -378,6 +381,16 @@ export const WorkspaceWorklogsRecap = observer(function WorkspaceWorklogsRecap()
       });
   }, [summary?.monthly_project_user_totals, summary?.payments]);
 
+  const filteredPaymentGroups = useMemo(() => {
+    return paymentGroups.filter((group) => {
+      if (paymentFilter === "due" && group.residual <= 0) return false;
+      if (paymentFilter === "paid" && group.residual > 0) return false;
+      if (paymentActorId && group.row.actor_id !== paymentActorId) return false;
+      if (paymentProjectId && group.row.project_id !== paymentProjectId) return false;
+      return true;
+    });
+  }, [paymentGroups, paymentFilter, paymentActorId, paymentProjectId]);
+
   return (
     <>
       <PageHead title={pageTitle} />
@@ -457,11 +470,61 @@ export const WorkspaceWorklogsRecap = observer(function WorkspaceWorklogsRecap()
                 acconto a metà mese e saldo a fine mese): il residuo &quot;da pagare&quot; si calcola automaticamente.
                 {selectedMonth !== "all" && ` Mese selezionato: ${formatMonth(selectedMonth)}.`}
               </p>
-              {paymentGroups.length === 0 ? (
-                <p className="py-2 text-body-sm-regular text-tertiary">{t("activity_empty_state.no_worklogs")}</p>
+              <div className="flex flex-wrap items-center gap-2 pb-3">
+                {(
+                  [
+                    { key: "due", label: "Da pagare" },
+                    { key: "paid", label: "Pagati" },
+                    { key: "all", label: "Tutti" },
+                  ] as const
+                ).map((option) => (
+                  <button
+                    key={option.key}
+                    type="button"
+                    onClick={() => setPaymentFilter(option.key)}
+                    className={`rounded-md border px-2.5 py-1 text-body-sm-regular transition ${
+                      paymentFilter === option.key
+                        ? "border-accent-strong bg-accent-primary text-on-color"
+                        : "border-subtle text-secondary hover:bg-layer-1"
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+                <select
+                  value={paymentActorId}
+                  onChange={(event) => setPaymentActorId(event.target.value)}
+                  className="rounded-md border border-subtle bg-surface-1 px-2.5 py-1.5 text-body-sm-regular text-primary outline-none"
+                >
+                  <option value="">Tutti i membri</option>
+                  {(summary?.user_totals ?? []).map((item) => (
+                    <option key={item.actor_id ?? ""} value={item.actor_id ?? ""}>
+                      {item.actor_detail?.display_name ?? t("unknown_user")}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  value={paymentProjectId}
+                  onChange={(event) => setPaymentProjectId(event.target.value)}
+                  className="rounded-md border border-subtle bg-surface-1 px-2.5 py-1.5 text-body-sm-regular text-primary outline-none"
+                >
+                  <option value="">Tutti i progetti</option>
+                  {(summary?.project_totals ?? []).map((item) => (
+                    <option key={item.project_id ?? ""} value={item.project_id ?? ""}>
+                      {item.project_name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              {filteredPaymentGroups.length === 0 ? (
+                <p className="py-2 text-body-sm-regular text-tertiary">
+                  {paymentFilter === "due"
+                    ? "Nessuna ora da pagare con questi filtri."
+                    : t("activity_empty_state.no_worklogs")}
+                </p>
               ) : (
                 <div className="space-y-3">
-                  {paymentGroups.map((group) => {
+                  {filteredPaymentGroups.map((group) => {
                     const newDraft = paymentNewDraft[group.key];
                     return (
                       <div key={group.key} className="rounded-md border border-subtle p-3">
