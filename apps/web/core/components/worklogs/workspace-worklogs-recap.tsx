@@ -10,6 +10,7 @@ import { useParams } from "next/navigation";
 // plane imports
 import { EUserPermissions, EUserPermissionsLevel } from "@plane/constants";
 import { useTranslation } from "@plane/i18n";
+import { TOAST_TYPE, setToast } from "@plane/propel/toast";
 import type {
   TWorkspaceWorklogLogEntry,
   TWorkspaceWorklogLogParams,
@@ -320,8 +321,15 @@ export const WorkspaceWorklogsRecap = observer(function WorkspaceWorklogsRecap()
     if (!workspaceSlug) return;
     try {
       await updateProject(workspaceSlug, projectId, { client: clientId || null });
+      setToast({
+        type: TOAST_TYPE.SUCCESS,
+        title: "Salvato",
+        message: clientId ? "Cliente associato al progetto." : "Cliente rimosso dal progetto.",
+      });
+      const refreshed = await issueService.fetchWorkspaceWorklogSummary(workspaceSlug);
+      setOverview(refreshed);
     } catch {
-      // ignore
+      setToast({ type: TOAST_TYPE.ERROR, title: "Errore", message: "Associazione non riuscita." });
     }
   };
 
