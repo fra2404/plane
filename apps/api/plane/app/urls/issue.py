@@ -32,6 +32,7 @@ from plane.app.views import (
     IssueMetaEndpoint,
     IssueDetailIdentifierEndpoint,
     IssueWorklogViewSet,
+    WorkspaceWorklogLogEndpoint,
     WorkspaceWorklogSummaryEndpoint,
     WorklogPaymentViewSet,
 )
@@ -307,6 +308,11 @@ urlpatterns = [
         "workspaces/<str:slug>/worklog-summary/",
         WorkspaceWorklogSummaryEndpoint.as_view(),
         name="workspace-worklog-summary",
+    ),
+    path(
+        "workspaces/<str:slug>/worklog-log/",
+        WorkspaceWorklogLogEndpoint.as_view(),
+        name="workspace-worklog-log",
     ),
     path(
         "workspaces/<str:slug>/worklog-payments/",

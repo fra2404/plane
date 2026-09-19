@@ -277,6 +277,97 @@ class IssueWorklogViewSet(BaseViewSet):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
+class WorkspaceWorklogLogEndpoint(BaseAPIView):
+    """Admin-only flat log of every worklog entry in the workspace (filterable + sortable)."""
+
+    permission_classes = [WorkspaceEntityPermission]
+
+    ORDER_BY_WHITELIST = {
+        "logged_at",
+        "-logged_at",
+        "duration",
+        "-duration",
+        "actor__display_name",
+        "-actor__display_name",
+        "project__name",
+        "-project__name",
+        "issue__name",
+        "-issue__name",
+    }
+
+    def get(self, request, slug):
+        is_admin = WorkspaceMember.objects.filter(
+            workspace__slug=slug,
+            member=request.user,
+            role=ROLE.ADMIN.value,
+            is_active=True,
+        ).exists()
+        if not is_admin:
+            return Response(
+                {"error": "You don't have the required permissions."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        worklogs = IssueWorklog.objects.filter(
+            workspace__slug=slug,
+            project__archived_at__isnull=True,
+        ).select_related("actor", "project", "issue")
+
+        project_id = request.GET.get("project_id")
+        if project_id:
+            worklogs = worklogs.filter(project_id=project_id)
+
+        actor_id = request.GET.get("actor_id")
+        if actor_id:
+            worklogs = worklogs.filter(actor_id=actor_id)
+
+        date_from = parse_date(request.GET.get("date_from", "")) if request.GET.get("date_from") else None
+        date_to = parse_date(request.GET.get("date_to", "")) if request.GET.get("date_to") else None
+        if date_from:
+            worklogs = worklogs.filter(logged_at__date__gte=date_from)
+        if date_to:
+            worklogs = worklogs.filter(logged_at__date__lte=date_to)
+
+        order_by = request.GET.get("order_by", "-logged_at")
+        if order_by not in self.ORDER_BY_WHITELIST:
+            order_by = "-logged_at"
+        worklogs = worklogs.order_by(order_by, "-created_at")
+
+        try:
+            limit = int(request.GET.get("limit", 500))
+        except (TypeError, ValueError):
+            limit = 500
+        limit = max(1, min(limit, 2000))
+
+        total_duration = worklogs.aggregate(total=Sum("duration"))["total"] or 0
+
+        results = [
+            {
+                "id": str(worklog.id),
+                "logged_at": worklog.logged_at.isoformat(),
+                "actor_id": str(worklog.actor_id) if worklog.actor_id else None,
+                "actor_detail": UserLiteSerializer(worklog.actor).data if worklog.actor else None,
+                "project_id": str(worklog.project_id),
+                "project_name": worklog.project.name if worklog.project else "",
+                "issue_id": str(worklog.issue_id),
+                "issue_name": worklog.issue.name if worklog.issue else "",
+                "issue_sequence_id": worklog.issue.sequence_id if worklog.issue else None,
+                "duration": worklog.duration or 0,
+                "description": worklog.description or "",
+            }
+            for worklog in worklogs[:limit]
+        ]
+
+        return Response(
+            {
+                "results": results,
+                "total": worklogs.count(),
+                "total_duration": total_duration,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
 class WorkspaceWorklogSummaryEndpoint(BaseAPIView):
     """Workspace-level worklog recap for admins: hours per user per work item."""
 

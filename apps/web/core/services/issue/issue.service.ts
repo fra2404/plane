@@ -19,6 +19,8 @@ import type {
   TIssueSubIssues,
   TIssueWorklog,
   TIssueWorklogListResponse,
+  TWorkspaceWorklogLogParams,
+  TWorkspaceWorklogLogResponse,
   TWorkspaceWorklogSummary,
   TWorkspaceWorklogSummaryParams,
   TWorklogPayment,
@@ -528,6 +530,17 @@ export class IssueService extends APIService {
     params?: TWorkspaceWorklogSummaryParams
   ): Promise<TWorkspaceWorklogSummary> {
     return this.get(`/api/workspaces/${workspaceSlug}/worklog-summary/`, { params })
+      .then((response) => response?.data)
+      .catch((error) => {
+        throw error?.response;
+      });
+  }
+
+  async fetchWorkspaceWorklogLog(
+    workspaceSlug: string,
+    params?: TWorkspaceWorklogLogParams
+  ): Promise<TWorkspaceWorklogLogResponse> {
+    return this.get(`/api/workspaces/${workspaceSlug}/worklog-log/`, { params })
       .then((response) => response?.data)
       .catch((error) => {
         throw error?.response;

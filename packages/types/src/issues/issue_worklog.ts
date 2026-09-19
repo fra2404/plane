@@ -124,3 +124,32 @@ export type TWorkspaceWorklogSummaryParams = {
   date_from?: string;
   date_to?: string;
 };
+
+export type TWorkspaceWorklogLogEntry = {
+  id: string;
+  logged_at: string;
+  actor_id: string | null;
+  actor_detail: IUserLite | null;
+  project_id: string;
+  project_name: string;
+  issue_id: string;
+  issue_name: string;
+  issue_sequence_id: number | null;
+  duration: number;
+  description: string;
+};
+
+export type TWorkspaceWorklogLogResponse = {
+  results: TWorkspaceWorklogLogEntry[];
+  total: number;
+  total_duration: number;
+};
+
+export type TWorkspaceWorklogLogParams = {
+  project_id?: string;
+  actor_id?: string;
+  date_from?: string;
+  date_to?: string;
+  order_by?: string;
+  limit?: number;
+};

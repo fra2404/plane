@@ -10,7 +10,13 @@ import { useParams } from "next/navigation";
 // plane imports
 import { EUserPermissions, EUserPermissionsLevel } from "@plane/constants";
 import { useTranslation } from "@plane/i18n";
-import type { TWorkspaceWorklogMonthProjectUserTotal, TWorkspaceWorklogSummary, TWorklogPayment } from "@plane/types";
+import type {
+  TWorkspaceWorklogLogEntry,
+  TWorkspaceWorklogLogParams,
+  TWorkspaceWorklogMonthProjectUserTotal,
+  TWorkspaceWorklogSummary,
+  TWorklogPayment,
+} from "@plane/types";
 import { formatWorklogDuration } from "@plane/utils";
 // components
 import { NotAuthorizedView } from "@/components/auth-screens/not-authorized-view";
@@ -66,6 +72,19 @@ export const WorkspaceWorklogsRecap = observer(function WorkspaceWorklogsRecap()
   const [paymentEditDraft, setPaymentEditDraft] = useState<Record<string, TPaymentDraft>>({});
   const [paymentNewDraft, setPaymentNewDraft] = useState<Record<string, TPaymentDraft>>({});
   const [savingPayment, setSavingPayment] = useState<string | null>(null);
+  const [logEntries, setLogEntries] = useState<TWorkspaceWorklogLogEntry[]>([]);
+  const [logMeta, setLogMeta] = useState<{ total: number; duration: number }>({ total: 0, duration: 0 });
+  const [logLoading, setLogLoading] = useState(false);
+  const [logFilters, setLogFilters] = useState<{
+    actor_id: string;
+    project_id: string;
+    date_from: string;
+    date_to: string;
+  }>({ actor_id: "", project_id: "", date_from: "", date_to: "" });
+  const [logSort, setLogSort] = useState<{
+    key: "logged_at" | "actor" | "project" | "issue" | "duration";
+    dir: "asc" | "desc";
+  }>({ key: "logged_at", dir: "desc" });
 
   const canAdmin = allowPermissions([EUserPermissions.ADMIN], EUserPermissionsLevel.WORKSPACE);
 
@@ -250,6 +269,34 @@ export const WorkspaceWorklogsRecap = observer(function WorkspaceWorklogsRecap()
     };
   }, [workspaceSlug, canAdmin, selectedMonth]);
 
+  // Flat worklog registry (all members), filterable.
+  useEffect(() => {
+    if (!workspaceSlug || !canAdmin) return;
+    let isActive = true;
+    setLogLoading(true);
+    const params: TWorkspaceWorklogLogParams = { limit: 1000 };
+    if (logFilters.actor_id) params.actor_id = logFilters.actor_id;
+    if (logFilters.project_id) params.project_id = logFilters.project_id;
+    if (logFilters.date_from) params.date_from = logFilters.date_from;
+    if (logFilters.date_to) params.date_to = logFilters.date_to;
+    const load = async () => {
+      try {
+        const response = await issueService.fetchWorkspaceWorklogLog(workspaceSlug, params);
+        if (!isActive) return;
+        setLogEntries(response?.results ?? []);
+        setLogMeta({ total: response?.total ?? 0, duration: response?.total_duration ?? 0 });
+      } catch {
+        if (isActive) setLogEntries([]);
+      } finally {
+        if (isActive) setLogLoading(false);
+      }
+    };
+    void load();
+    return () => {
+      isActive = false;
+    };
+  }, [workspaceSlug, canAdmin, logFilters]);
+
   if (workspaceUserInfo && !canAdmin) {
     return <NotAuthorizedView section="settings" className="h-auto" />;
   }
@@ -258,6 +305,28 @@ export const WorkspaceWorklogsRecap = observer(function WorkspaceWorklogsRecap()
   const userTotals = summary?.user_totals ?? [];
   const rows = summary?.results ?? [];
   const months = overview?.monthly_totals ?? summary?.monthly_totals ?? [];
+  const sortedLogEntries = useMemo(() => {
+    // oxlint-disable-next-line unicorn/no-array-sort
+    return [...logEntries].sort((a, b) => {
+      const dir = logSort.dir === "asc" ? 1 : -1;
+      switch (logSort.key) {
+        case "actor":
+          return (a.actor_detail?.display_name ?? "").localeCompare(b.actor_detail?.display_name ?? "") * dir;
+        case "project":
+          return a.project_name.localeCompare(b.project_name) * dir;
+        case "issue":
+          return a.issue_name.localeCompare(b.issue_name) * dir;
+        case "duration":
+          return (a.duration - b.duration) * dir;
+        default:
+          return a.logged_at.localeCompare(b.logged_at) * dir;
+      }
+    });
+  }, [logEntries, logSort]);
+
+  const toggleLogSort = (key: "logged_at" | "actor" | "project" | "issue" | "duration") =>
+    setLogSort((prev) => (prev.key === key ? { key, dir: prev.dir === "asc" ? "desc" : "asc" } : { key, dir: "asc" }));
+
   const paymentGroups = useMemo(() => {
     const projectUserRows = summary?.monthly_project_user_totals ?? [];
     const byKey = new Map<string, TWorklogPayment[]>();
@@ -595,6 +664,126 @@ export const WorkspaceWorklogsRecap = observer(function WorkspaceWorklogsRecap()
                       </div>
                     );
                   })}
+                </div>
+              )}
+            </div>
+
+            <div>
+              <div className="flex flex-wrap items-center justify-between gap-2 pb-2">
+                <div>
+                  <h5 className="text-body-sm-medium text-secondary">Registro ore</h5>
+                  <p className="text-body-xs-regular text-tertiary">
+                    Tutte le registrazioni di ore del workspace. Clicca le intestazioni per ordinare.
+                  </p>
+                </div>
+                <span className="text-body-sm-regular text-tertiary">
+                  {logMeta.total} voci ·{" "}
+                  <span className="font-medium text-primary">{formatWorklogDuration(logMeta.duration)}</span>
+                </span>
+              </div>
+              <div className="flex flex-wrap items-center gap-2 pb-3">
+                <select
+                  value={logFilters.actor_id}
+                  onChange={(event) => setLogFilters((prev) => ({ ...prev, actor_id: event.target.value }))}
+                  className="rounded-md border border-subtle bg-surface-1 px-2.5 py-1.5 text-body-sm-regular text-primary outline-none"
+                >
+                  <option value="">Tutti i membri</option>
+                  {(summary?.user_totals ?? []).map((item) => (
+                    <option key={item.actor_id ?? ""} value={item.actor_id ?? ""}>
+                      {item.actor_detail?.display_name ?? t("unknown_user")}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  value={logFilters.project_id}
+                  onChange={(event) => setLogFilters((prev) => ({ ...prev, project_id: event.target.value }))}
+                  className="rounded-md border border-subtle bg-surface-1 px-2.5 py-1.5 text-body-sm-regular text-primary outline-none"
+                >
+                  <option value="">Tutti i progetti</option>
+                  {(summary?.project_totals ?? []).map((item) => (
+                    <option key={item.project_id ?? ""} value={item.project_id ?? ""}>
+                      {item.project_name}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  type="date"
+                  value={logFilters.date_from}
+                  onChange={(event) => setLogFilters((prev) => ({ ...prev, date_from: event.target.value }))}
+                  className="rounded-md border border-subtle bg-surface-1 px-2.5 py-1.5 text-body-sm-regular text-primary outline-none"
+                />
+                <input
+                  type="date"
+                  value={logFilters.date_to}
+                  onChange={(event) => setLogFilters((prev) => ({ ...prev, date_to: event.target.value }))}
+                  className="rounded-md border border-subtle bg-surface-1 px-2.5 py-1.5 text-body-sm-regular text-primary outline-none"
+                />
+                {(logFilters.actor_id || logFilters.project_id || logFilters.date_from || logFilters.date_to) && (
+                  <button
+                    type="button"
+                    onClick={() => setLogFilters({ actor_id: "", project_id: "", date_from: "", date_to: "" })}
+                    className="rounded border border-subtle px-2 py-1 text-11 text-secondary"
+                  >
+                    Azzera filtri
+                  </button>
+                )}
+              </div>
+              {logLoading ? (
+                <p className="py-2 text-body-sm-regular text-tertiary">{t("loading")}...</p>
+              ) : sortedLogEntries.length === 0 ? (
+                <p className="py-2 text-body-sm-regular text-tertiary">{t("activity_empty_state.no_worklogs")}</p>
+              ) : (
+                <div className="overflow-x-auto rounded-md border border-subtle">
+                  <table className="w-full table-auto text-left text-body-sm-regular">
+                    <thead className="bg-surface-2 text-tertiary">
+                      <tr>
+                        {(
+                          [
+                            { key: "logged_at", label: "Data" },
+                            { key: "actor", label: "Membro" },
+                            { key: "project", label: "Progetto" },
+                            { key: "issue", label: "Work item" },
+                            { key: "duration", label: "Ore" },
+                          ] as const
+                        ).map((column) => (
+                          <th key={column.key} className="px-3 py-2 font-medium">
+                            <button
+                              type="button"
+                              className="flex items-center gap-1 hover:text-primary"
+                              onClick={() => toggleLogSort(column.key)}
+                            >
+                              {column.label}
+                              {logSort.key === column.key && <span>{logSort.dir === "asc" ? "▲" : "▼"}</span>}
+                            </button>
+                          </th>
+                        ))}
+                        <th className="px-3 py-2 font-medium">Descrizione</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {sortedLogEntries.map((entry) => (
+                        <tr key={entry.id} className="border-t border-subtle">
+                          <td className="px-3 py-2 whitespace-nowrap text-secondary">
+                            {new Date(entry.logged_at).toLocaleDateString()}
+                          </td>
+                          <td className="px-3 py-2 text-primary">
+                            {entry.actor_detail?.display_name ?? t("unknown_user")}
+                          </td>
+                          <td className="px-3 py-2 text-secondary">{entry.project_name}</td>
+                          <td className="max-w-64 truncate px-3 py-2 text-secondary" title={entry.issue_name}>
+                            {entry.issue_sequence_id ? `${entry.issue_sequence_id}-` : ""}
+                            {entry.issue_name}
+                          </td>
+                          <td className="px-3 py-2 text-right font-medium text-primary">
+                            {formatWorklogDuration(entry.duration)}
+                          </td>
+                          <td className="max-w-80 truncate px-3 py-2 text-tertiary" title={entry.description}>
+                            {entry.description || "—"}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               )}
             </div>
