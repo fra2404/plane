@@ -75,7 +75,7 @@ class Migration(migrations.Migration):
                     "client",
                     models.ForeignKey(
                         on_delete=django.db.models.deletion.CASCADE,
-                        related_name="notes",
+                        related_name="timeline_entries",
                         to="db.intranetclient",
                     ),
                 ),

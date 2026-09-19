@@ -150,7 +150,7 @@ class ClientNote(WorkspaceBaseModel):
         ("altro", "Altro"),
     )
 
-    client = models.ForeignKey("db.IntranetClient", on_delete=models.CASCADE, related_name="notes")
+    client = models.ForeignKey("db.IntranetClient", on_delete=models.CASCADE, related_name="timeline_entries")
     author = models.ForeignKey(
         "db.User",
         on_delete=models.SET_NULL,
